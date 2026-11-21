@@ -57,7 +57,7 @@ Only variable names are listed. Values must be provided in `.env` (never committ
 - `DATABASE_URL`: PostgreSQL connection string
 - `PG_SSL`: SSL mode (`require` or `off`)
 - `PG_CA_B64`: Base64 encoded CA certificate for PostgreSQL (optional if system trust applies)
-- `PG_POOL_MAX`: Maximum database pool connections
+- `PG_POOL_MAX`: Maximum database pool connections for the API (default `5`). Worker process defaults to `3` (configurable via `WORKER_PG_POOL_MAX`). Aiven free plan limits `max_connections` to 20, so 5 (API) + 3 (worker) + 3 (spare) = 11 keeps connections safely below the 20 limit.
 - `KAFKA_BROKERS`: Comma-separated list of Kafka broker host:port
 - `KAFKA_CA_B64`: Base64 encoded CA certificate for Kafka
 - `KAFKA_CERT_B64`: Base64 encoded client certificate for Kafka (certificate auth)

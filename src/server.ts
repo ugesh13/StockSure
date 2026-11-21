@@ -10,6 +10,7 @@ import { refreshHealth, startHealthMonitor } from './services/health.ts';
 import { isKafkaPatched } from '../scripts/patch-kafkajs.ts';
 
 // API process: HTTP + outbox relay + expiry sweeper. Run exactly one copy of the relay.
+process.env.PG_POOL_MAX = process.env.PG_POOL_MAX ?? '5';
 loadConfigOrExit(['pg', 'kafka', 'opensearch', 'api']);
 
 if (!isKafkaPatched()) {
