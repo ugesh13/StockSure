@@ -185,6 +185,13 @@ export async function runSeedNursery() {
   // Deactivate legacy products
   await pool.query('UPDATE products SET is_active = false WHERE is_nursery IS NOT TRUE');
 
+  // Alias old plant SKUs to DEMO- SKUs if needed
+  await pool.query("UPDATE products SET sku = 'DEMO-RACE' WHERE sku = 'PLANT-snake-plant-6-inch-pot'");
+  await pool.query("UPDATE products SET sku = 'DEMO-RESCUE' WHERE sku = 'PLANT-tulsi-holy-basil-6-inch-pot'");
+  await pool.query("UPDATE products SET sku = 'DEMO-OOS' WHERE sku = 'PLANT-desert-rose-8-inch-pot'");
+  await pool.query("UPDATE products SET sku = 'DEMO-STALE' WHERE sku = 'PLANT-marigold-4-inch-pot'");
+  await pool.query("UPDATE products SET sku = 'DEMO-HOLD' WHERE sku = 'PLANT-aloe-vera-6-inch-pot'");
+
   // Read CSV
   const csvCandidates = [
     path.resolve(process.cwd(), 'data/nursery_plants_seed.csv'),
@@ -214,10 +221,11 @@ export async function runSeedNursery() {
 
   let insertedCount = 0;
   const demoSkus: Record<string, string> = {
-    rescue: 'PLANT-tulsi-holy-basil-6-inch-pot',
-    race: 'PLANT-snake-plant-6-inch-pot',
-    oos: 'PLANT-desert-rose-8-inch-pot',
-    stale: 'PLANT-marigold-4-inch-pot',
+    rescue: 'DEMO-RESCUE',
+    race: 'DEMO-RACE',
+    oos: 'DEMO-OOS',
+    stale: 'DEMO-STALE',
+    hold: 'DEMO-HOLD',
   };
 
   for (const p of plants) {
@@ -225,7 +233,13 @@ export async function runSeedNursery() {
     const aliases = buildAliases(p);
 
     for (const v of variants) {
-      const sku = `PLANT-${slugify(p.common_name)}-${slugify(v.suffix)}`;
+      let sku = `PLANT-${slugify(p.common_name)}-${slugify(v.suffix)}`;
+      if (p.common_name.toLowerCase().includes('snake plant') && v.size === '6-inch') sku = 'DEMO-RACE';
+      else if (p.common_name.toLowerCase().includes('tulsi') && v.size === '6-inch') sku = 'DEMO-RESCUE';
+      else if (p.common_name.toLowerCase().includes('desert rose') && v.size === '8-inch') sku = 'DEMO-OOS';
+      else if (p.common_name.toLowerCase().includes('marigold') && v.size === '4-inch') sku = 'DEMO-STALE';
+      else if (p.common_name.toLowerCase().includes('aloe vera') && v.size === '6-inch') sku = 'DEMO-HOLD';
+
       const name = `${p.common_name}, ${v.suffix}`;
       const tags = buildTags(p, v.suffix, aliases);
 
@@ -333,6 +347,13 @@ export async function runSeedNursery() {
   // 4. DEMO-STALE: Marigold 4-inch pot at branch 3: freshness timestamp older than STALE_SECONDS (60s)
   await pool.query("UPDATE branches SET last_heartbeat_at = now() - interval '2 hours' WHERE id = 3");
   await pool.query('UPDATE branches SET last_heartbeat_at = now() WHERE id <> 3');
+
+  // 5. DEMO-HOLD: Aloe vera 6-inch pot: branch 1 on_hand 2
+  const holdRes = await pool.query<{ id: number }>('SELECT id FROM products WHERE sku = $1', [demoSkus.hold]);
+  const holdId = holdRes.rows[0]?.id;
+  if (holdId) {
+    await pool.query('UPDATE inventory SET on_hand = 2, reserved = 0, buffer = 0 WHERE product_id = $1 AND branch_id = 1', [holdId]);
+  }
 
   // Counts after
   const afterProds = await pool.query<{ count: string }>('SELECT count(*)::text as count FROM products WHERE is_active = true');
