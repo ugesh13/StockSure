@@ -114,11 +114,35 @@ When a branch's last heartbeat is older than 60 seconds (or has never checked in
 - **Delivery**: There is no courier integration, dispatch dispatching, or automated inter-branch transfers. `DELIVERY` exists purely as a fulfilment flag on orders and checkout.
 - **Zoho Inventory**: The Zoho adapter is fully implemented with OAuth refresh, retry on 401, and simulated fallback, but is not verified against a live Zoho production account.
 
-## Known limits
+## Real vs Simulated
 
-- **Search Latency & Index Lag**: OpenSearch indexing is asynchronous via Kafka consumer. Search queries reflect eventual consistency (~1-2 seconds after outbox relay).
-- **Branch Heartbeat Window**: Branches without POS heartbeat within 60 seconds transition to `CONFIRM_WITH_STORE` status.
-- **Single Outbox Relay Process**: Only one process should run `RUN_RELAY=true` to prevent duplicate polling overhead.
+| Component | Status | Implementation Details |
+|---|---|---|
+| **Guarded Reserve** | **REAL** | PostgreSQL row-level locks via atomic `UPDATE inventory SET reserved = reserved + qty WHERE on_hand - reserved - buffer >= qty` with `SERIALIZABLE` isolation. |
+| **Transactional Outbox & Kafka** | **REAL** | Outbox pattern with transactional inserts in Postgres, outbox relay polling, and asynchronous consumer finalizing stock and updating OpenSearch. |
+| **Search & Synonyms** | **REAL** | OpenSearch custom analyzer with 8 bilingual synonym groups (vernacular Hindi/Kannada, scientific botanical names, typos, English common names). |
+| **Real-time Heartbeat Freshness** | **REAL** | Heartbeat timestamp validation (`last_heartbeat_at`) transitioning unrefreshed branches to `CONFIRM_WITH_STORE` after `STALE_SECONDS` (60s). |
+| **POS Cash Registers** | *Simulated* | `npm run pos-sim` simulates physical in-store walk-in sales via `POST /pos/sale` and periodic POS heartbeat telemetry. |
+| **Inventory Drift** | *Simulated* | Drift and variance between physical stock and digital counts are simulated via `POST /staff/count`. |
+| **Cart Abandonment** | *Simulated* | Background sweeper (`sweepOnce`) automatically reclaims unpurchased reservations after `HOLD_MINUTES` (10m). |
+
+## System Limits
+
+- **Single Region Deployment**: All components run within a single Aiven cloud region; there is currently no cross-region active-active replication.
+- **In-Memory Rate Limiting**: Route rate limiting uses Fastify in-memory token bucket; rate limits are per-node and not shared across horizontal API replicas.
+- **Outbox Consumer Sync vs Async CDC**: Search documents are indexed via transactional outbox worker polling rather than Debezium/Postgres logical decoding CDC.
+
+## How to Run the Judge Demo
+
+Run the automated judge demo test suite which sets up scoped test fixtures and executes all 10 judge criteria:
+
+```bash
+# 1. Reset scoped demo fixtures (touches ONLY DEMO-* SKUs)
+npm run demo:fixture
+
+# 2. Run the 10-point judge scoreboard
+npm run judge-demo
+```
 
 ## API Endpoints (all JSON)
 
