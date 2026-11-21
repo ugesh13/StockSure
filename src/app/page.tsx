@@ -309,7 +309,7 @@ export default function Home() {
 
   // Simultaneous Collision Disappearance:
   // When the pot hits the pause symbol at rollEnd, BOTH pot and pause symbol disappear immediately together
-  const collisionDisappear = useTransform(scrollY, [rollEnd - 5, rollEnd], [1, 0], { clamp: true });
+  const collisionDisappear = useTransform(scrollY, [rollEnd - 6, rollEnd - 1], [1, 0], { clamp: true });
   const collisionPointerEvents = useTransform(scrollY, (v) => (v >= rollEnd ? 'none' : 'auto'));
 
   // Rotation: exactly 2 complete rotations (-720deg) so pot settles perfectly upright at collision
