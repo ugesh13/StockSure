@@ -1,0 +1,112 @@
+[
+  {
+    "common_name": "Snake plant",
+    "scientific_name": "Sansevieria trifasciata",
+    "aliases": ["snake plant", "sansevieria", "mother-in-law's tongue"],
+    "light": "Low to bright indirect light",
+    "water": "Allow soil to dry out completely between waterings (every 2-3 weeks)",
+    "soil": "Free-draining succulent or cactus mix",
+    "pet_friendly": false,
+    "verified": true,
+    "tips": "Extremely hardy; excellent for bedrooms and indoor air purification."
+  },
+  {
+    "common_name": "Peace lily",
+    "scientific_name": "Spathiphyllum wallisii",
+    "aliases": ["peace lily", "spathiphyllum"],
+    "light": "Medium to low indirect light; avoid direct sun",
+    "water": "Keep soil lightly moist; droops when thirsty and bounces back after watering",
+    "soil": "Rich, well-aerated potting mix with perlite",
+    "pet_friendly": false,
+    "verified": true,
+    "tips": "Produces elegant white blooms and thrives in higher humidity."
+  },
+  {
+    "common_name": "Money plant",
+    "scientific_name": "Epipremnum aureum",
+    "aliases": ["money plant", "golden pothos", "devil's ivy"],
+    "light": "Bright indirect to low light",
+    "water": "Water when top 2 inches of soil feel dry (once a week)",
+    "soil": "Standard peat-based potting soil",
+    "pet_friendly": false,
+    "verified": true,
+    "tips": "Fast-growing trailing vine; can be grown in soil or water vases."
+  },
+  {
+    "common_name": "Monstera",
+    "scientific_name": "Monstera deliciosa",
+    "aliases": ["monstera", "swiss cheese plant"],
+    "light": "Bright indirect sunlight",
+    "water": "Water when top 2 inches of soil are dry (approx every 7-10 days)",
+    "soil": "Chunky, peat-based aroid mix with bark and perlite",
+    "pet_friendly": false,
+    "verified": true,
+    "tips": "Wipe broad leaves with a damp cloth monthly to support photosynthesis."
+  },
+  {
+    "common_name": "ZZ plant",
+    "scientific_name": "Zamioculcas zamiifolia",
+    "aliases": ["zz plant", "zanzibar gem"],
+    "light": "Low to bright indirect light",
+    "water": "Water sparingly every 2-3 weeks; drought tolerant",
+    "soil": "Well-draining potting soil",
+    "pet_friendly": false,
+    "verified": true,
+    "tips": "Thrives on neglect and tolerates fluorescent office lighting."
+  },
+  {
+    "common_name": "Tulsi (holy basil)",
+    "scientific_name": "Ocimum tenuiflorum",
+    "aliases": ["tulsi", "holy basil", "tulasi"],
+    "light": "Full direct sunlight (at least 4-6 hours daily)",
+    "water": "Water daily in warm weather; keep soil moist but not soggy",
+    "soil": "Fertile, loamy, well-draining garden soil",
+    "pet_friendly": true,
+    "verified": true,
+    "tips": "Pinch off flower buds regularly to encourage bushy leaf growth."
+  },
+  {
+    "common_name": "Areca palm",
+    "scientific_name": "Dypsis lutescens",
+    "aliases": ["areca palm", "yellow palm", "butterfly palm"],
+    "light": "Bright filtered or indirect sunlight",
+    "water": "Water when top inch of soil feels dry",
+    "soil": "Rich, peat-based mix with good drainage",
+    "pet_friendly": true,
+    "verified": true,
+    "tips": "Natural indoor humidifier and non-toxic to cats and dogs."
+  },
+  {
+    "common_name": "Aloe vera",
+    "scientific_name": "Aloe vera",
+    "aliases": ["aloe vera", "aloe", "ghritkumari"],
+    "light": "Bright direct to indirect sunlight",
+    "water": "Water deeply every 3 weeks; allow soil to dry completely",
+    "soil": "Cactus or succulent potting mix",
+    "pet_friendly": false,
+    "verified": true,
+    "tips": "Harvest outer mature leaves for soothing natural gel."
+  },
+  {
+    "common_name": "Jade plant",
+    "scientific_name": "Crassula ovata",
+    "aliases": ["jade plant", "money tree", "crassula"],
+    "light": "At least 4 hours of direct sunlight",
+    "water": "Water when soil is completely dry",
+    "soil": "Fast-draining gritty succulent mix",
+    "pet_friendly": false,
+    "verified": true,
+    "tips": "Symbol of good luck and prosperity; compact tree-like appearance."
+  },
+  {
+    "common_name": "Arabian jasmine (Mogra)",
+    "scientific_name": "Jasminum sambac",
+    "aliases": ["mogra", "arabian jasmine", "mallige", "jasmine"],
+    "light": "Full sun to partial direct sunlight",
+    "water": "Keep soil evenly moist, especially during flowering season",
+    "soil": "Rich, well-draining loamy soil",
+    "pet_friendly": true,
+    "verified": true,
+    "tips": "Highly fragrant blooms; feed with organic compost monthly."
+  }
+]

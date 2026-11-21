@@ -1,0 +1,121 @@
+### Variables
+@baseUrl = http://localhost:3000
+@staffKey = dev-staff-key-change-me
+@authToken = sess_sample_token
+
+### 1.1 Register New Account
+POST {{baseUrl}}/auth/register
+Content-Type: application/json
+
+{
+  "name": "Arjun Mehta",
+  "email": "arjun.demo@example.com",
+  "password": "Password123!",
+  "phone": "9876543210"
+}
+
+### 1.2 Login
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "arjun.demo@example.com",
+  "password": "Password123!"
+}
+
+### 1.3 Get Current Profile (/me)
+GET {{baseUrl}}/me
+Authorization: Bearer {{authToken}}
+
+### 1.4 Forgot Password
+POST {{baseUrl}}/auth/password/forgot
+Content-Type: application/json
+
+{
+  "email": "arjun.demo@example.com"
+}
+
+### 1.5 Logout
+POST {{baseUrl}}/auth/logout
+Authorization: Bearer {{authToken}}
+
+### 2.1 Nearest Branches
+GET {{baseUrl}}/branches/nearest?lat=12.9716&lng=77.5946&limit=3
+
+### 2.2 Branch Directions
+GET {{baseUrl}}/branches/1/directions?from_lat=12.9716&from_lng=77.5946
+
+### 2.3 Delivery Quote
+GET {{baseUrl}}/delivery/quote?lat=12.9716&lng=77.5946&amount_paise=120000
+
+### 2.4 Geocode Address
+POST {{baseUrl}}/geo/geocode
+Content-Type: application/json
+
+{
+  "address": "Indiranagar 100ft Road, Bengaluru"
+}
+
+### 3.1 Initialize Payment
+POST {{baseUrl}}/orders/964c2a9d-12d2-4b07-98b0-09498cef7944/payment
+Authorization: Bearer {{authToken}}
+
+### 3.2 Verify Payment
+POST {{baseUrl}}/orders/964c2a9d-12d2-4b07-98b0-09498cef7944/payment/verify
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "razorpay_order_id": "order_mock_9a8b7c",
+  "razorpay_payment_id": "pay_mock_123456",
+  "razorpay_signature": "mock_signature_hash"
+}
+
+### 3.3 Delivery Tracking (Customer)
+GET {{baseUrl}}/orders/964c2a9d-12d2-4b07-98b0-09498cef7944/tracking
+Authorization: Bearer {{authToken}}
+
+### 3.4 Update Delivery Status (Staff)
+PATCH {{baseUrl}}/staff/deliveries/964c2a9d-12d2-4b07-98b0-09498cef7944/status
+x-staff-key: {{staffKey}}
+Content-Type: application/json
+
+{
+  "status": "OUT_FOR_DELIVERY",
+  "note": "Rider out on vehicle"
+}
+
+### 3.5 Complete Delivery with Handover Code (Staff)
+PATCH {{baseUrl}}/staff/deliveries/964c2a9d-12d2-4b07-98b0-09498cef7944/status
+x-staff-key: {{staffKey}}
+Content-Type: application/json
+
+{
+  "status": "DELIVERED",
+  "handover_code": "1234",
+  "note": "Delivered to recipient"
+}
+
+### 4.1 Chat - General FAQ
+POST {{baseUrl}}/chat
+Content-Type: application/json
+
+{
+  "message": "how fast is your delivery?"
+}
+
+### 4.2 Chat - Product Search
+POST {{baseUrl}}/chat
+Content-Type: application/json
+
+{
+  "message": "find monstera plants"
+}
+
+### 4.3 Chat - Human Escalation
+POST {{baseUrl}}/chat
+Content-Type: application/json
+
+{
+  "message": "I need to talk to a human agent"
+}

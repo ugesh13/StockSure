@@ -19,6 +19,8 @@ export type SearchResult = {
   category: string;
   price_paise: number;
   image_url: string | null;
+  image_credit: string | null;
+  image_status: string;
   best_status: DisplayStatus;
   branches: BranchAvailability[];
 };
@@ -37,6 +39,8 @@ type OsSource = {
   category: string;
   price_paise: number;
   image_url: string | null;
+  image_credit?: string | null;
+  image_status?: string | null;
   branch_id: number;
   branch_name: string;
   city: string;
@@ -63,6 +67,8 @@ function fromOpenSearch(raw: any, beats: Map<number, BranchBeat>): { total: numb
       category: top.category,
       price_paise: top.price_paise,
       image_url: top.image_url ?? null,
+      image_credit: top.image_credit ?? null,
+      image_status: top.image_status ?? 'missing',
       best_status: bestStatus(branches.map((b) => b.status)),
       branches,
     };
@@ -78,6 +84,8 @@ type FallbackBranch = {
   category: string;
   price_paise: number;
   image_url: string | null;
+  image_credit?: string | null;
+  image_status?: string | null;
   branch_id: number;
   branch_name: string;
   city: string;
@@ -117,6 +125,8 @@ async function fromPostgres(p: SearchParams, beats: Map<number, BranchBeat>): Pr
       category: head.category,
       price_paise: head.price_paise,
       image_url: head.image_url,
+      image_credit: head.image_credit ?? null,
+      image_status: head.image_status ?? 'missing',
       best_status: bestStatus(branches.map((b) => b.status)),
       branches,
     });

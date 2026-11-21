@@ -22,6 +22,8 @@ export type CartLineView = {
   brand: string;
   price_paise: number;
   image_url: string | null;
+  image_credit?: string | null;
+  image_status?: string | null;
   branch_id: number;
   branch_name: string;
   city: string;

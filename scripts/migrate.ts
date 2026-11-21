@@ -8,7 +8,7 @@ import { closePool, getPool } from '../src/db.ts';
 loadConfigOrExit(['pg']);
 
 const dir = join(dirname(fileURLToPath(import.meta.url)), '..', 'sql');
-const files = readdirSync(dir).filter((f) => f.endsWith('.sql')).sort();
+const files = readdirSync(dir).filter((f) => f.endsWith('.sql') && !f.startsWith('rollback')).sort();
 
 const c = await getPool().connect();
 try {

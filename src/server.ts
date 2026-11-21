@@ -10,6 +10,7 @@ import { refreshHealth, startHealthMonitor } from './services/health.ts';
 import { isKafkaPatched } from '../scripts/patch-kafkajs.ts';
 
 // API process: HTTP + outbox relay + expiry sweeper. Run exactly one copy of the relay.
+process.env.PG_POOL_MAX = process.env.PG_POOL_MAX ?? '5';
 loadConfigOrExit(['pg', 'kafka', 'opensearch', 'api']);
 
 if (!isKafkaPatched()) {
@@ -52,6 +53,12 @@ try {
   };
   process.on('SIGTERM', () => void shutdown('SIGTERM'));
   process.on('SIGINT', () => void shutdown('SIGINT'));
+  process.on('uncaughtException', (err) => {
+    log('error', 'uncaughtException handled', { error: err.message });
+  });
+  process.on('unhandledRejection', (reason) => {
+    log('error', 'unhandledRejection handled', { error: String(reason) });
+  });
 } catch (e) {
   log('error', 'api failed to start', errFields(e));
   process.exit(1);

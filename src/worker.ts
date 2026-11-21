@@ -11,9 +11,9 @@ import { log, errFields } from './log.ts';
 import { ensureIndex } from './search/opensearch.ts';
 
 // Worker process: consumers only. Each consumer is its own consumer group, so each reads every event independently.
-// Small pool (4): the free Postgres plan allows 20 connections in total (API 6 + worker 4 leaves room).
-// The worker's pool is set here, not by PG_POOL_MAX (that one is the API's pool and .env.example sets it to 6).
-process.env.PG_POOL_MAX = process.env.WORKER_PG_POOL_MAX ?? '4';
+// Small pool (3): the free Postgres plan allows 20 connections in total (API 5 + worker 3 + 3 spare stays comfortably under 20).
+// The worker's pool is set here, not by PG_POOL_MAX (that one is the API's pool and .env.example sets it to 5).
+process.env.PG_POOL_MAX = process.env.WORKER_PG_POOL_MAX ?? '3';
 loadConfigOrExit(['pg', 'kafka', 'opensearch']);
 
 const specs: ConsumerSpec[] = [

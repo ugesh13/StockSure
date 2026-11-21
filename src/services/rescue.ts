@@ -29,7 +29,7 @@ export type RescueOption =
       line: StockLine;
       candidates: { product_id: number; name: string; price_paise: number; branch_id: number; available: number }[];
     }
-  | { type: 'ONE_BRANCH'; branch_id: number; branch_name: string; city: string }
+  | { type: 'ONE_BRANCH'; branch_id: number; branch_name: string; city: string; message: string }
   | { type: 'SPLIT'; assignments: SplitAssignment[] }
   | { type: 'BACK_IN_STOCK'; lines: StockLine[] };
 
@@ -71,7 +71,15 @@ export async function buildRescue(db: Db, failed: PricedLine[], all: PricedLine[
     merged.map((m) => m.qty),
     city ?? '',
   ]);
-  for (const b of one.rows) options.push({ type: 'ONE_BRANCH', branch_id: b.branch_id, branch_name: b.branch_name, city: b.city });
+  for (const b of one.rows) {
+    options.push({
+      type: 'ONE_BRANCH',
+      branch_id: b.branch_id,
+      branch_name: b.branch_name,
+      city: b.city,
+      message: `Available for pickup at ${b.branch_name} (${b.city})`,
+    });
+  }
 
   // 3. Split across branches (fewest shipments)
   const stock = await db.query<BranchStock>(BRANCH_STOCK_SQL, [failed.map((f) => f.product_id)]);

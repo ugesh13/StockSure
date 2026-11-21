@@ -1,16 +1,16 @@
-// Store department definitions and category mappings
-// Date: 2026-11-20
+// Store department (aisle) definitions for the StockSure Nursery.
+// `category` must match products.category exactly, as written by scripts/seed-nursery.ts from data/nursery_plants_seed.csv.
 
 export const DEPARTMENTS = [
-  { code: 'A', category: 'audio', label: 'Audio', hi: 'ऑडियो' },
-  { code: 'B', category: 'mobiles', label: 'Mobiles & tablets', hi: 'मोबाइल और टैबलेट' },
-  { code: 'C', category: 'computing', label: 'Computing & networking', hi: 'कंप्यूटर और नेटवर्किंग' },
-  { code: 'D', category: 'tv', label: 'TVs & entertainment', hi: 'टीवी और मनोरंजन' },
-  { code: 'E', category: 'appliances', label: 'Home appliances', hi: 'घरेलू उपकरण' },
-  { code: 'F', category: 'wearables', label: 'Wearables', hi: 'वियरेबल्स' },
-  { code: 'G', category: 'accessories', label: 'Accessories', hi: 'एक्सेसरीज़' },
-  { code: 'H', category: 'personal_care', label: 'Personal care', hi: 'पर्सनल केयर' },
-  { code: 'I', category: 'household', label: 'Household & cleaning', hi: 'घर और सफाई' },
-  { code: 'J', category: 'grocery', label: 'Grocery & beverages', hi: 'किराना और पेय' },
+  { code: 'A', category: 'Indoor foliage', label: 'Indoor foliage', hi: 'इनडोर पौधे' },
+  { code: 'B', category: 'Flowering plants', label: 'Flowering plants', hi: 'फूलों के पौधे' },
+  { code: 'C', category: 'Herbs & medicinal', label: 'Herbs & medicinal', hi: 'जड़ी-बूटी और औषधीय' },
+  { code: 'D', category: 'Fruit plants', label: 'Fruit plants', hi: 'फलों के पौधे' },
+  { code: 'E', category: 'Vegetable seedlings', label: 'Vegetable seedlings', hi: 'सब्ज़ी की पौध' },
+  { code: 'F', category: 'Succulents & cacti', label: 'Succulents & cacti', hi: 'रसीले पौधे और कैक्टस' },
+  { code: 'G', category: 'Palms & ferns', label: 'Palms & ferns', hi: 'पाम और फ़र्न' },
+  { code: 'H', category: 'Sacred plants', label: 'Sacred plants', hi: 'पवित्र पौधे' },
+  { code: 'I', category: 'Aquatic & orchids', label: 'Aquatic & orchids', hi: 'जलीय पौधे और ऑर्किड' },
 ] as const;
 
+export const NURSERY_CATEGORIES: string[] = DEPARTMENTS.map((d) => d.category);

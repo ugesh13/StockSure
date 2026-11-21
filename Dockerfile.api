@@ -14,7 +14,7 @@ COPY tsconfig.json ./
 COPY src ./src
 COPY sql ./sql
 COPY scripts ./scripts
-COPY catalogue.psv ./
+COPY data ./data
 
 # Run patch check
 RUN node scripts/patch-kafkajs.ts --check

@@ -1,5 +1,8 @@
+import fs from 'node:fs';
+import path from 'node:path';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
+import { cfg } from '../config.ts';
 import { getHealth } from '../services/health.ts';
 import { getPool, pingPg, withTx } from '../db.ts';
 import { replayDlq } from '../kafka/dlq.ts';
@@ -21,6 +24,12 @@ import { withTimeout } from '../util.ts';
 import { syncInventoryWithZoho } from '../integrations/zoho.ts';
 import { IdSchema, UuidSchema, customerOf, idempotencyKeyOf, requireAdmin, requireDemoOrStaff, requireStaff, respondCheckout, shopperCityOf } from './common.ts';
 import { createSession, deleteCustomerAccount } from '../services/session.ts';
+import { authRoutes } from './auth.ts';
+import { paymentRoutes } from './payments.ts';
+import { mapsRoutes } from './maps.ts';
+import { deliveryRoutes } from './delivery.ts';
+import { chatRoutes } from './chat.ts';
+import { validateDeliveryAddress, getDeliveryQuote, createDeliveryRecord } from '../services/delivery.ts';
 import {
   addProductRequest,
   getProductRequests,
@@ -41,6 +50,7 @@ const ItemParams = z.object({ productId: IdSchema, branchId: IdSchema });
 const CheckoutBody = z.object({
   fulfilment: z.enum(['PICKUP', 'DELIVERY', 'IN_STORE']).default('PICKUP'),
   branch_id: IdSchema.optional(),
+  address: z.any().optional(),
 });
 const OrderParams = z.object({ id: UuidSchema });
 
@@ -81,6 +91,13 @@ async function check(fn: () => Promise<Record<string, unknown>>): Promise<Record
 }
 
 export function registerRoutes(app: FastifyInstance): void {
+  // ---------- auth ----------
+  app.register(authRoutes);
+  app.register(paymentRoutes);
+  app.register(mapsRoutes);
+  app.register(deliveryRoutes);
+  app.register(chatRoutes);
+
   // ---------- health ----------
   app.get('/health', async (_req, reply) => {
     const h = getHealth();
@@ -120,13 +137,53 @@ export function registerRoutes(app: FastifyInstance): void {
     },
     async (req) => {
       const token = req.headers['x-session-token'];
-      if (!token || typeof token !== 'string' || !token.trim()) {
+      const bearer = req.headers.authorization;
+      const hasToken = (typeof token === 'string' && token.trim()) || (typeof bearer === 'string' && bearer.startsWith('Bearer ') && bearer.slice(7).trim());
+      if (!hasToken) {
         throw new AppError(401, 'SESSION_REQUIRED', 'Session token is required to delete account.');
       }
       const customerId = await customerOf(req);
       return deleteCustomerAccount(customerId);
     },
   );
+
+  // ---------- static plant images ----------
+  // Serves verified plant images from data/plant-images/
+  // Enforces immutable caching and blocks directory traversal attempts (returns 404)
+  app.get('/static/plants/*', async (req, reply) => {
+    const raw = (req.params as Record<string, string>)['*'] || '';
+    if (
+      !raw ||
+      raw.includes('..') ||
+      raw.includes('/') ||
+      raw.includes('\\') ||
+      raw.includes('\0') ||
+      raw.includes('%2e') ||
+      raw.includes('%2f') ||
+      raw.includes('%5c')
+    ) {
+      return reply.status(404).send({ error: { code: 'NOT_FOUND', message: 'Plant image not found' } });
+    }
+    const filename = path.basename(raw);
+    if (!/^[a-zA-Z0-9_.-]+$/.test(filename)) {
+      return reply.status(404).send({ error: { code: 'NOT_FOUND', message: 'Plant image not found' } });
+    }
+    const safeDir = path.resolve(process.cwd(), 'data', 'plant-images');
+    const targetFile = path.resolve(safeDir, filename);
+    if (!targetFile.startsWith(safeDir) || !fs.existsSync(targetFile)) {
+      return reply.status(404).send({ error: { code: 'NOT_FOUND', message: 'Plant image not found' } });
+    }
+    let contentType = 'image/jpeg';
+    if (filename.endsWith('.png')) contentType = 'image/png';
+    else if (filename.endsWith('.webp')) contentType = 'image/webp';
+    else if (filename.endsWith('.svg')) contentType = 'image/svg+xml';
+
+    const stream = fs.createReadStream(targetFile);
+    return reply
+      .header('Cache-Control', 'public, max-age=86400, immutable')
+      .header('Content-Type', contentType)
+      .send(stream);
+  });
 
   // ---------- browse ----------
   app.get('/products', LIMIT(240), async (req) => {
@@ -209,10 +266,42 @@ export function registerRoutes(app: FastifyInstance): void {
   app.post('/checkout', LIMIT(120), async (req, reply) => {
     const body = CheckoutBody.parse(req.body ?? {});
     const customerId = await customerOf(req);
-    const result = await checkout(customerId, idempotencyKeyOf(req), body.fulfilment, body.branch_id);
+
+    let validatedAddress: any = null;
+    let quote: any = null;
+    if (body.fulfilment === 'DELIVERY') {
+      if (!body.address) {
+        throw new AppError(422, 'MISSING_ADDRESS', 'Delivery address is required when fulfilment is DELIVERY');
+      }
+      validatedAddress = validateDeliveryAddress(body.address);
+      // Quote against the cart subtotal so the free-delivery threshold actually applies.
+      const subtotal = (await getCart(customerId)).total_paise;
+      quote = await getDeliveryQuote(validatedAddress.lat, validatedAddress.lng, subtotal);
+      if (!quote.serviceable) {
+        throw new AppError(400, 'OUT_OF_SERVICE_AREA', quote.reason || 'Address is outside our delivery radius');
+      }
+      if (!body.branch_id && quote.branch_id) {
+        body.branch_id = quote.branch_id;
+      }
+    }
+
+    const isDelivery = body.fulfilment === 'DELIVERY' && validatedAddress && quote;
+    const result = await checkout(customerId, idempotencyKeyOf(req), body.fulfilment, body.branch_id, isDelivery
+      ? {
+          // The fee is part of what the shopper pays, and the delivery row is written in the same transaction as the order.
+          extraPaise: quote.fee_paise || 0,
+          afterReserve: async (c, orderId) => {
+            await createDeliveryRecord(orderId, body.branch_id || quote.branch_id, validatedAddress, quote.distance_km || 0, quote.fee_paise || 0, c);
+          },
+        }
+      : {});
+
     return respondCheckout(reply, result, shopperCityOf(req));
   });
   app.post('/orders/:id/pay', LIMIT(30), async (req) => {
+    if (cfg().PAYMENT_PROVIDER === 'razorpay' && !cfg().DEMO_MODE) {
+      throw new AppError(404, 'ROUTE_DISABLED', 'POST /orders/:id/pay is disabled in Razorpay mode. Use /orders/:id/payment and /orders/:id/payment/verify');
+    }
     const { id } = OrderParams.parse(req.params);
     const customerId = await customerOf(req);
     const r = await payOrder(customerId, id);

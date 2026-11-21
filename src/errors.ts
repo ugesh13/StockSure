@@ -11,6 +11,11 @@ export class AppError extends Error {
     this.code = code;
     this.details = details;
   }
+
+  /** Same as `status`. Lets callers that check Fastify-style `statusCode` read it too. */
+  get statusCode(): number {
+    return this.status;
+  }
 }
 
 export const notFound = (what: string): AppError => new AppError(404, 'NOT_FOUND', `${what} not found`);

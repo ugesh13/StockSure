@@ -12,18 +12,26 @@ SELECT product_id, branch_id, qty FROM cart_items WHERE cart_id = $1::int ORDER 
 
 export const CART_VIEW_SQL = `
 SELECT ci.product_id, p.name, p.brand, p.price_paise, p.image_url,
+       p.image_status,
+       CASE 
+         WHEN p.image_author IS NOT NULL AND p.image_license IS NOT NULL 
+           THEN 'Photo: ' || p.image_author || ', ' || p.image_license
+         WHEN p.image_author IS NOT NULL 
+           THEN 'Photo: ' || p.image_author
+         ELSE NULL 
+       END AS image_credit,
        ci.branch_id, b.name AS branch_name, b.city, ci.qty,
        GREATEST(i.on_hand - i.reserved - i.buffer, 0)::int AS available
   FROM carts ca
   JOIN cart_items ci ON ci.cart_id = ca.id
-  JOIN products   p  ON p.id = ci.product_id
+  JOIN products   p  ON p.id = ci.product_id AND p.is_active = true
   JOIN branches   b  ON b.id = ci.branch_id
   JOIN inventory  i  ON i.branch_id = ci.branch_id AND i.product_id = ci.product_id
  WHERE ca.customer_id = $1::int
  ORDER BY ci.branch_id, ci.product_id`;
 
 export const STOCK_EXISTS_SQL = `
-SELECT 1 AS ok FROM inventory WHERE branch_id = $1::int AND product_id = $2::int`;
+SELECT 1 AS ok FROM inventory i JOIN products p ON p.id = i.product_id WHERE i.branch_id = $1::int AND i.product_id = $2::int AND p.is_active = true`;
 
 export const UPSERT_ITEM_SQL = `
 INSERT INTO cart_items (cart_id, product_id, branch_id, qty) VALUES ($1::int, $2::int, $3::int, $4::int)
@@ -43,7 +51,7 @@ export const CART_LINES_SQL = `
 SELECT ci.branch_id, ci.product_id, ci.qty, p.price_paise AS unit_price_paise, p.name, b.name AS branch_name
   FROM carts ca
   JOIN cart_items ci ON ci.cart_id = ca.id
-  JOIN products p ON p.id = ci.product_id
+  JOIN products p ON p.id = ci.product_id AND p.is_active = true
   JOIN branches b ON b.id = ci.branch_id
  WHERE ca.customer_id = $1::int`;
 
@@ -66,11 +74,13 @@ SELECT id FROM orders
 // THE GUARDED RESERVE. One statement decides who gets the last unit. 0 rows = not enough stock.
 // Under READ COMMITTED a second buyer waits for the first, then Postgres re-checks the WHERE on the updated row.
 export const RESERVE_SQL = `
-UPDATE inventory
-   SET reserved = reserved + $3::int, rev = rev + 1, updated_at = now()
- WHERE branch_id = $1::int AND product_id = $2::int
-   AND on_hand - reserved - buffer >= $3::int
-RETURNING on_hand, reserved, buffer, rev`;
+UPDATE inventory i
+   SET reserved = i.reserved + $3::int, rev = i.rev + 1, updated_at = now()
+  FROM products p
+ WHERE i.branch_id = $1::int AND i.product_id = $2::int
+   AND p.id = i.product_id AND p.is_active = true
+   AND i.on_hand - i.reserved - i.buffer >= $3::int
+RETURNING i.on_hand, i.reserved, i.buffer, i.rev`;
 
 export const INSERT_LINES_SQL = `
 INSERT INTO order_lines (order_id, product_id, branch_id, qty, unit_price_paise)
@@ -168,17 +178,36 @@ RETURNING id`;
 // Search document source (indexer) and full rebuild (reindex).
 export const DOC_SOURCE_SQL = `
 SELECT p.id AS product_id, p.sku, p.name, p.brand, p.category, p.tags, p.price_paise, p.image_url,
+       p.image_status,
+       CASE 
+         WHEN p.image_author IS NOT NULL AND p.image_license IS NOT NULL 
+           THEN 'Photo: ' || p.image_author || ', ' || p.image_license
+         WHEN p.image_author IS NOT NULL 
+           THEN 'Photo: ' || p.image_author
+         ELSE NULL 
+       END AS image_credit,
+       p.plant_common_name, p.name_hi, p.name_kn, p.scientific_name, p.aliases, p.variant_group, p.variant_size, p.is_active,
        b.id AS branch_id, b.name AS branch_name, b.city
   FROM products p CROSS JOIN branches b
- WHERE p.id = $1::int AND b.id = $2::int`;
+ WHERE p.id = $1::int AND b.id = $2::int AND p.is_active = true`;
 
 export const REINDEX_ROWS_SQL = `
 SELECT p.id AS product_id, p.sku, p.name, p.brand, p.category, p.tags, p.price_paise, p.image_url,
+       p.image_status,
+       CASE 
+         WHEN p.image_author IS NOT NULL AND p.image_license IS NOT NULL 
+           THEN 'Photo: ' || p.image_author || ', ' || p.image_license
+         WHEN p.image_author IS NOT NULL 
+           THEN 'Photo: ' || p.image_author
+         ELSE NULL 
+       END AS image_credit,
+       p.plant_common_name, p.name_hi, p.name_kn, p.scientific_name, p.aliases, p.variant_group, p.variant_size, p.is_active,
        b.id AS branch_id, b.name AS branch_name, b.city,
        i.on_hand, i.reserved, i.buffer, i.rev
   FROM inventory i
   JOIN products p ON p.id = i.product_id
   JOIN branches b ON b.id = i.branch_id
+ WHERE p.is_active = true
  ORDER BY i.product_id, i.branch_id`;
 
 // ---------- outbox relay ----------
@@ -200,6 +229,14 @@ export const RELAY_FAILED_SQL = `UPDATE outbox SET attempts = attempts + 1 WHERE
 // ---------- catalog ----------
 export const PRODUCTS_LIST_SQL = `
 SELECT p.id, p.sku, p.name, p.brand, p.category, p.tags, p.price_paise, p.image_url,
+       p.image_status,
+       CASE 
+         WHEN p.image_author IS NOT NULL AND p.image_license IS NOT NULL 
+           THEN 'Photo: ' || p.image_author || ', ' || p.image_license
+         WHEN p.image_author IS NOT NULL 
+           THEN 'Photo: ' || p.image_author
+         ELSE NULL 
+       END AS image_credit,
        COALESCE(SUM(GREATEST(x.available, 0)), 0)::int AS available_total
   FROM products p
   LEFT JOIN (
@@ -207,20 +244,31 @@ SELECT p.id, p.sku, p.name, p.brand, p.category, p.tags, p.price_paise, p.image_
           FROM inventory i JOIN branches b ON b.id = i.branch_id
          WHERE ($2::text IS NULL OR b.city = $2::text)
        ) x ON x.product_id = p.id
- WHERE ($1::text IS NULL OR p.category = $1::text)
+ WHERE p.is_active = true AND ($1::text IS NULL OR p.category = $1::text)
  GROUP BY p.id
  ORDER BY p.id
  LIMIT $3::int OFFSET $4::int`;
 
-export const PRODUCTS_COUNT_SQL = `SELECT count(*)::int AS n FROM products WHERE ($1::text IS NULL OR category = $1::text)`;
-export const PRODUCT_SQL = `SELECT id, sku, name, brand, category, tags, price_paise, image_url FROM products WHERE id = $1::int`;
-export const CATEGORIES_SQL = `SELECT category, count(*)::int AS products FROM products GROUP BY category ORDER BY category`;
+export const PRODUCTS_COUNT_SQL = `SELECT count(*)::int AS n FROM products WHERE is_active = true AND ($1::text IS NULL OR category = $1::text)`;
+export const PRODUCT_SQL = `
+SELECT id, sku, name, brand, category, tags, price_paise, image_url,
+       image_status,
+       CASE 
+         WHEN image_author IS NOT NULL AND image_license IS NOT NULL 
+           THEN 'Photo: ' || image_author || ', ' || image_license
+         WHEN image_author IS NOT NULL 
+           THEN 'Photo: ' || image_author
+         ELSE NULL 
+       END AS image_credit
+  FROM products WHERE id = $1::int AND is_active = true`;
+export const CATEGORIES_SQL = `SELECT category, count(*)::int AS products FROM products WHERE is_active = true GROUP BY category ORDER BY category`;
 export const BRANCHES_SQL = `SELECT id, name, city, lat, lng, last_heartbeat_at FROM branches ORDER BY id`;
 
 export const PRODUCT_BRANCHES_SQL = `
 SELECT b.id AS branch_id, b.name AS branch_name, b.city,
        (i.on_hand - i.reserved - i.buffer)::int AS available
   FROM inventory i JOIN branches b ON b.id = i.branch_id
+  JOIN products p ON p.id = i.product_id AND p.is_active = true
  WHERE i.product_id = $1::int
  ORDER BY b.id`;
 
@@ -230,7 +278,8 @@ SELECT p.id,
        GREATEST(similarity(p.name, $1::text), word_similarity($1::text, p.name),
                 word_similarity($1::text, p.brand), word_similarity($1::text, array_to_string(p.tags, ' '))) AS score
   FROM products p
- WHERE ($2::text IS NULL OR p.category = $2::text)
+ WHERE p.is_active = true
+   AND ($2::text IS NULL OR p.category = $2::text)
    AND ($3::int IS NULL OR p.price_paise >= $3::int)
    AND ($4::int IS NULL OR p.price_paise <= $4::int)
    AND ($1::text = ''
@@ -243,12 +292,20 @@ SELECT p.id,
 
 export const FALLBACK_BRANCHES_SQL = `
 SELECT p.id AS product_id, p.name, p.brand, p.category, p.price_paise, p.image_url,
+       p.image_status,
+       CASE 
+         WHEN p.image_author IS NOT NULL AND p.image_license IS NOT NULL 
+           THEN 'Photo: ' || p.image_author || ', ' || p.image_license
+         WHEN p.image_author IS NOT NULL 
+           THEN 'Photo: ' || p.image_author
+         ELSE NULL 
+       END AS image_credit,
        i.branch_id, b.name AS branch_name, b.city,
        (i.on_hand - i.reserved - i.buffer)::int AS available
   FROM products p
   JOIN inventory i ON i.product_id = p.id
   JOIN branches b ON b.id = i.branch_id
- WHERE p.id = ANY($1::int[]) AND ($2::text IS NULL OR b.city = $2::text)`;
+ WHERE p.is_active = true AND p.id = ANY($1::int[]) AND ($2::text IS NULL OR b.city = $2::text)`;
 
 // ---------- Rescue Ladder ----------
 // 1. Swap an equivalent: same category, price within +-15%, in stock at the same branch, closest price first.
@@ -257,7 +314,8 @@ SELECT p.id AS product_id, p.name, p.price_paise, i.branch_id,
        GREATEST(i.on_hand - i.reserved - i.buffer, 0)::int AS available
   FROM products p
   JOIN inventory i ON i.product_id = p.id
- WHERE p.category = (SELECT category FROM products WHERE id = $1::int)
+ WHERE p.is_active = true
+   AND p.category = (SELECT category FROM products WHERE id = $1::int AND is_active = true)
    AND p.id <> $1::int
    AND i.branch_id = $2::int
    AND p.price_paise BETWEEN ($3::bigint * 85 / 100) AND ($3::bigint * 115 / 100)
@@ -270,6 +328,7 @@ export const ONE_BRANCH_SQL = `
 SELECT i.branch_id, b.name AS branch_name, b.city
   FROM inventory i
   JOIN branches b ON b.id = i.branch_id
+  JOIN products p ON p.id = i.product_id AND p.is_active = true
   JOIN unnest($1::int[], $2::int[]) AS want(product_id, qty) ON want.product_id = i.product_id
  WHERE i.on_hand - i.reserved - i.buffer >= want.qty
  GROUP BY i.branch_id, b.name, b.city
@@ -281,6 +340,7 @@ HAVING count(*) = cardinality($1::int[])
 export const BRANCH_STOCK_SQL = `
 SELECT i.branch_id, b.city, i.product_id, (i.on_hand - i.reserved - i.buffer)::int AS available
   FROM inventory i JOIN branches b ON b.id = i.branch_id
+  JOIN products p ON p.id = i.product_id AND p.is_active = true
  WHERE i.product_id = ANY($1::int[]) AND i.on_hand - i.reserved - i.buffer > 0`;
 
 export const FAILED_DETAIL_SQL = `

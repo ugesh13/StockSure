@@ -65,6 +65,26 @@ const Schema = z.object({
   ZOHO_ORG_ID: str(),
   ZOHO_ACCOUNTS_URL: z.string().default('https://accounts.zoho.in'),
   ZOHO_API_URL: z.string().default('https://www.zohoapis.in/inventory/v1'),
+
+  PAYMENT_PROVIDER: z.enum(['mock', 'razorpay']).default('mock'),
+  RAZORPAY_KEY_ID: str(),
+  RAZORPAY_KEY_SECRET: str(),
+  RAZORPAY_WEBHOOK_SECRET: str(),
+  PAYMENT_TTL_MINUTES: int(15, 1, 120),
+
+  GOOGLE_MAPS_SERVER_KEY: str(),
+
+  GOOGLE_CLIENT_ID: str(),
+  GOOGLE_CLIENT_SECRET: str(),
+  GOOGLE_CALLBACK_URL: str(),
+  FRONTEND_URL: z.string().default('http://localhost:5173'),
+
+  DELIVERY_MAX_KM: int(15, 1, 100),
+  DELIVERY_BASE_FEE: int(40, 0, 1000),
+  DELIVERY_PER_KM: int(8, 0, 100),
+  FREE_DELIVERY_ABOVE: int(999, 0, 10000),
+
+  CHAT_LLM_PROVIDER: z.enum(['none', 'gemini']).default('none'),
 });
 
 export type Config = z.infer<typeof Schema>;
@@ -116,6 +136,25 @@ export function loadConfig(groups: Group[], defaults: Record<string, string> = {
   if (groups.includes('api')) {
     for (const name of ['STAFF_KEY', 'ADMIN_TOKEN'] as const) {
       if (c[name] && c[name].length < 8) problems.push(`${name} must be at least 8 characters`);
+    }
+  }
+
+  // Google OAuth validation: enabled only if all 3 are set. If partially set, fail naming missing variable.
+  const googleVars = ['GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET', 'GOOGLE_CALLBACK_URL'] as const;
+  const googleSet = googleVars.filter((v) => Boolean(c[v]));
+  if (googleSet.length > 0 && googleSet.length < googleVars.length) {
+    const missing = googleVars.filter((v) => !c[v]);
+    for (const m of missing) {
+      problems.push(`${m} is required`);
+    }
+  }
+
+  // FRONTEND_URL must be listed in CORS_ORIGINS to prevent open redirects
+  if (c.FRONTEND_URL) {
+    const origins = c.CORS_ORIGINS.split(',').map((o) => o.trim().replace(/\/$/, '')).filter(Boolean);
+    const frontend = c.FRONTEND_URL.trim().replace(/\/$/, '');
+    if (!origins.includes(frontend)) {
+      problems.push('FRONTEND_URL must be one of CORS_ORIGINS');
     }
   }
   if (problems.length > 0) throw new ConfigError(problems);
