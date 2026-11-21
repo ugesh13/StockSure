@@ -24,6 +24,7 @@ import { IdSchema, UuidSchema, customerOf, idempotencyKeyOf, requireAdmin, requi
 import { createSession, deleteCustomerAccount } from '../services/session.ts';
 import { authRoutes } from './auth.ts';
 import { paymentRoutes } from './payments.ts';
+import { mapsRoutes } from './maps.ts';
 import {
   addProductRequest,
   getProductRequests,
@@ -87,6 +88,7 @@ export function registerRoutes(app: FastifyInstance): void {
   // ---------- auth ----------
   app.register(authRoutes);
   app.register(paymentRoutes);
+  app.register(mapsRoutes);
 
   // ---------- health ----------
   app.get('/health', async (_req, reply) => {
