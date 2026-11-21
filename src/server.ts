@@ -53,6 +53,12 @@ try {
   };
   process.on('SIGTERM', () => void shutdown('SIGTERM'));
   process.on('SIGINT', () => void shutdown('SIGINT'));
+  process.on('uncaughtException', (err) => {
+    log('error', 'uncaughtException handled', { error: err.message });
+  });
+  process.on('unhandledRejection', (reason) => {
+    log('error', 'unhandledRejection handled', { error: String(reason) });
+  });
 } catch (e) {
   log('error', 'api failed to start', errFields(e));
   process.exit(1);
