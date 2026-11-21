@@ -1,12 +1,14 @@
 'use client';
 
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import { backend, getStoredToken, setStoredSession, clearStoredSession } from '@/lib/backend';
 
 export interface AuthUser {
-  id: string;
+  id: string | number;
   name: string;
   email: string;
-  createdAt?: string;
+  phone?: string | null;
+  is_guest?: boolean;
 }
 
 interface AuthContextType {
@@ -18,8 +20,9 @@ interface AuthContextType {
   closeAuthModal: () => void;
   setAuthMode: (mode: 'login' | 'register') => void;
   login: (email: string, password: string) => Promise<{ success: boolean; message?: string }>;
-  register: (name: string, email: string, password: string) => Promise<{ success: boolean; message?: string }>;
+  register: (name: string, email: string, password: string, phone?: string) => Promise<{ success: boolean; message?: string }>;
   logout: () => Promise<void>;
+  setSessionUser: (token: string, user: AuthUser) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -30,79 +33,99 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
 
-  // Check current session on mount
+  // Check current session from backend on mount
   useEffect(() => {
+    let active = true;
     async function checkAuth() {
+      const token = getStoredToken();
+      if (!token) {
+        if (active) setLoading(false);
+        return;
+      }
       try {
-        const res = await fetch('/api/auth/me');
-        const data = await res.json();
-        if (data.success && data.user) {
-          setUser(data.user);
+        const me = await backend.getMe();
+        if (active && me) {
+          setUser({
+            id: me.customer_id,
+            name: me.name,
+            email: me.email || '',
+            phone: me.phone,
+            is_guest: me.is_guest,
+          });
         }
       } catch (err) {
-        console.error('Session check failed', err);
+        // Token invalid or expired
+        clearStoredSession();
+        if (active) setUser(null);
       } finally {
-        setLoading(false);
+        if (active) setLoading(false);
       }
     }
     checkAuth();
+    return () => {
+      active = false;
+    };
   }, []);
 
-  const openAuthModal = (mode: 'login' | 'register' = 'login') => {
+  const openAuthModal = useCallback((mode: 'login' | 'register' = 'login') => {
     setAuthMode(mode);
     setIsAuthModalOpen(true);
-  };
+  }, []);
 
-  const closeAuthModal = () => {
+  const closeAuthModal = useCallback(() => {
     setIsAuthModalOpen(false);
-  };
+  }, []);
+
+  const setSessionUser = useCallback((token: string, userObj: AuthUser) => {
+    setStoredSession(token, userObj.id);
+    setUser(userObj);
+  }, []);
 
   const login = async (email: string, password: string) => {
     try {
-      const res = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
-      });
-      const data = await res.json();
-      if (data.success && data.user) {
-        setUser(data.user);
+      const res = await backend.login({ email, password });
+      if (res && res.token) {
+        setUser({
+          id: res.customer_id,
+          name: res.name,
+          email: res.email || email,
+        });
         closeAuthModal();
-        return { success: true, message: data.message };
-      } else {
-        return { success: false, message: data.message || 'Login failed' };
+        return { success: true, message: 'Welcome back!' };
       }
-    } catch {
-      return { success: false, message: 'Network error during login' };
+      return { success: false, message: 'Login failed' };
+    } catch (err: any) {
+      return { success: false, message: err.message || 'Invalid email or password' };
     }
   };
 
-  const register = async (name: string, email: string, password: string) => {
+  const register = async (name: string, email: string, password: string, phone?: string) => {
     try {
-      const res = await fetch('/api/auth/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, email, password }),
-      });
-      const data = await res.json();
-      if (data.success && data.user) {
-        setUser(data.user);
+      const res = await backend.register({ name, email, password, phone });
+      if (res && res.token) {
+        setUser({
+          id: res.customer_id,
+          name: res.name,
+          email: res.email || email,
+          phone,
+        });
         closeAuthModal();
-        return { success: true, message: data.message };
-      } else {
-        return { success: false, message: data.message || 'Registration failed' };
+        return { success: true, message: 'Account registered successfully!' };
       }
-    } catch {
-      return { success: false, message: 'Network error during registration' };
+      return { success: false, message: 'Registration failed' };
+    } catch (err: any) {
+      return { success: false, message: err.message || 'Unable to register account' };
     }
   };
 
   const logout = async () => {
     try {
-      await fetch('/api/auth/me', { method: 'DELETE' });
+      await backend.logout();
+    } catch {
+      // ignore
+    } finally {
+      clearStoredSession();
       setUser(null);
-    } catch (err) {
-      console.error('Logout error', err);
     }
   };
 
@@ -119,6 +142,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         login,
         register,
         logout,
+        setSessionUser,
       }}
     >
       {children}

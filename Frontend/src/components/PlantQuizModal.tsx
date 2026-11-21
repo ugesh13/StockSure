@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import Image from 'next/image';
 import { X, Sparkles, Sun, PawPrint, Award, ArrowRight, RotateCcw, ShoppingBag } from 'lucide-react';
-import { Product } from '@/data/products';
+import { Product, formatImageUrl } from '@/lib/backend';
 import { useCart } from '@/context/CartContext';
 
 interface PlantQuizModalProps {
@@ -39,8 +39,8 @@ export default function PlantQuizModal({
   const recommendedPlants = products.filter((p) => {
     if (petPref === true && !p.petFriendly) return false;
     if (expPref === 'beginner' && p.difficulty !== 'Beginner' && p.difficulty !== 'Easy') return false;
-    if (lightPref === 'low' && !p.light.includes('Low')) return false;
-    if (lightPref === 'sun' && !p.light.includes('Sun')) return false;
+    if (lightPref === 'low' && !p.light?.includes('Low')) return false;
+    if (lightPref === 'sun' && !p.light?.includes('Sun')) return false;
     return true;
   }).slice(0, 3);
 
@@ -229,7 +229,7 @@ export default function PlantQuizModal({
                 >
                   <div className="relative h-44 w-full rounded-[16px] overflow-hidden mb-3">
                     <Image
-                      src={plant.imageUrl}
+                      src={formatImageUrl(plant.imageUrl)}
                       alt={plant.name}
                       fill
                       className="object-cover"
@@ -238,12 +238,12 @@ export default function PlantQuizModal({
 
                   <div className="space-y-1">
                     <span className="text-[10px] uppercase font-bold text-moss">
-                      {plant.difficulty} · {plant.light.split(' ')[0]}
+                      {plant.difficulty || 'Easy'} · {plant.light ? plant.light.split(' ')[0] : 'Indoor'}
                     </span>
                     <h4 className="font-serif text-sm font-bold text-forest line-clamp-1">
                       {plant.name}
                     </h4>
-                    <p className="text-xs font-serif text-forest font-bold">${plant.price}</p>
+                    <p className="text-xs font-serif text-forest font-bold">₹{plant.price}</p>
                   </div>
 
                   <div className="flex items-center gap-2 pt-3 mt-1">

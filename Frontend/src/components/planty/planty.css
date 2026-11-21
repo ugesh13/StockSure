@@ -1,0 +1,116 @@
+/* ==========================================================================
+   PLANTY CHATBOT DESIGN TOKENS & ANIMATIONS
+   Visual target matches reference image: fresh green plant theme
+   ========================================================================== */
+
+:root {
+  --planty-header-start: #2F6B1F;
+  --planty-header-end: #4C8B2B;
+  --planty-header-text: #FFFFFF;
+  --planty-header-subtext: rgba(255, 255, 255, 0.88);
+  
+  --planty-panel-bg: #F5F9EA;
+  --planty-panel-border: rgba(47, 107, 31, 0.15);
+  
+  --planty-bot-bubble: #E3EDD0;
+  --planty-user-bubble: #D6E8BC;
+  
+  --planty-card-bg: #E6F0D4;
+  --planty-card-border: #CFE0B5;
+  
+  --planty-chip-bg: #F1F6E6;
+  --planty-chip-border: #CFE0B5;
+  --planty-chip-text: #2F4A22;
+  --planty-chip-hover: #E3ECD0;
+  
+  --planty-body-text: #24391A;
+  --planty-muted-text: #5E7650;
+  
+  --planty-send-btn: #4C9A3A;
+  --planty-send-btn-hover: #3E842E;
+  
+  --planty-launcher: #2F6B1F;
+  --planty-launcher-ring: #DCEBC5;
+  --planty-launcher-shadow: rgba(47, 107, 31, 0.35);
+  
+  --planty-sparkle: #F2D34B;
+  
+  --planty-font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+}
+
+/* Animations */
+@keyframes planty-float {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-6px);
+  }
+}
+
+@keyframes planty-panel-enter {
+  0% {
+    opacity: 0;
+    transform: scale(0.85) translateY(16px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes planty-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes planty-pulse-dot {
+  0%, 80%, 100% {
+    transform: scale(0.6);
+    opacity: 0.5;
+  }
+  40% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.planty-float {
+  animation: planty-float 4s ease-in-out infinite;
+}
+
+.planty-panel-enter {
+  animation: planty-panel-enter 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.planty-msg-enter {
+  animation: planty-fade-in 0.2s ease-out forwards;
+}
+
+.planty-dot:nth-child(1) {
+  animation: planty-pulse-dot 1.2s infinite ease-in-out;
+}
+.planty-dot:nth-child(2) {
+  animation: planty-pulse-dot 1.2s infinite ease-in-out 0.2s;
+}
+.planty-dot:nth-child(3) {
+  animation: planty-pulse-dot 1.2s infinite ease-in-out 0.4s;
+}
+
+.planty-scroll::-webkit-scrollbar {
+  height: 4px;
+  width: 4px;
+}
+.planty-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+.planty-scroll::-webkit-scrollbar-thumb {
+  background: rgba(47, 107, 31, 0.2);
+  border-radius: 4px;
+}

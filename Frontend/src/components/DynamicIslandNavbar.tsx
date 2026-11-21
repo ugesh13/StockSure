@@ -87,7 +87,7 @@ export default function DynamicIslandNavbar() {
       >
         {/* Main Navigation Bar */}
         <div className="flex items-center justify-between py-2.5 px-4 sm:px-6">
-          {/* Item 1: VERDANT Logo -> Smooth scroll to Home */}
+          {/* Item 1: StockSure Logo -> Smooth scroll to Home */}
           <div className="flex items-center flex-shrink-0">
             <a
               href="#home"
@@ -103,12 +103,12 @@ export default function DynamicIslandNavbar() {
               </div>
               <div className="flex flex-col">
                 <span className="editorial-serif text-lg font-bold tracking-widest leading-none text-white">
-                  VERDANT
+                  StockSure
                 </span>
               </div>
             </a>
 
-            {/* Spacing Divider between VERDANT logo and Navigation */}
+            {/* Spacing Divider between StockSure logo and Navigation */}
             <span className="hidden md:block h-4 w-[1px] bg-white/20 ml-3 sm:ml-4" aria-hidden="true" />
           </div>
 

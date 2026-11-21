@@ -1,23 +1,22 @@
 'use client';
 
 import React, { useState } from 'react';
-import Image from 'next/image';
 import confetti from 'canvas-confetti';
 import {
   X,
   ShieldCheck,
   Truck,
-  CheckCircle2,
-  AlertCircle,
-  CreditCard,
-  Building,
   PackageCheck,
   ArrowRight,
   Sprout,
+  Store,
+  AlertCircle,
+  Loader2,
+  CheckCircle2,
 } from 'lucide-react';
 import { useCart } from '@/context/CartContext';
 import { useAuth } from '@/context/AuthContext';
-import { Order } from '@/lib/db';
+import { backend, getStoredToken, Order, DeliveryTracking } from '@/lib/backend';
 
 interface CheckoutModalProps {
   isOpen: boolean;
@@ -26,22 +25,23 @@ interface CheckoutModalProps {
 }
 
 export default function CheckoutModal({ isOpen, onClose, onOrderSuccess }: CheckoutModalProps) {
-  const { items, subtotal, shippingCost, total, clearCart } = useCart();
+  const { items, subtotal, shippingCost, total, clearCart, selectedBranch, branches, setSelectedBranch } = useCart();
   const { user } = useAuth();
 
   // Form State
-  const [customerName, setCustomerName] = useState(user?.name || '');
-  const [customerEmail, setCustomerEmail] = useState(user?.email || '');
-  const [address, setAddress] = useState('42 Botanical Gardens Mews');
-  const [city, setCity] = useState('Bath');
-  const [postalCode, setPostalCode] = useState('BA1 2XW');
-  const [country, setCountry] = useState('United Kingdom');
-  const [notes, setNotes] = useState('Please leave in the porch sanctuary if unavailable');
-  const [paymentMethod, setPaymentMethod] = useState('Credit Card / Apple Pay');
+  const [fulfilment, setFulfilment] = useState<'DELIVERY' | 'PICKUP'>('DELIVERY');
+  const [customerName, setCustomerName] = useState(user?.name || 'Priya Sharma');
+  const [customerEmail, setCustomerEmail] = useState(user?.email || 'priya@stocksure.in');
+  const [phone, setPhone] = useState(user?.phone || '9876543210');
+  const [line1, setLine1] = useState('80 Feet Road, 4th Block, Koramangala');
+  const [city, setCity] = useState(selectedBranch.city || 'Bengaluru');
+  const [pincode, setPincode] = useState('560034');
 
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  const [isTestMode, setIsTestMode] = useState(false);
   const [confirmedOrder, setConfirmedOrder] = useState<Order | null>(null);
+  const [trackingInfo, setTrackingInfo] = useState<DeliveryTracking | null>(null);
 
   if (!isOpen) return null;
 
@@ -49,14 +49,32 @@ export default function CheckoutModal({ isOpen, onClose, onOrderSuccess }: Check
     e.preventDefault();
     setErrorMessage('');
 
-    if (!customerName.trim() || !customerEmail.trim()) {
-      setErrorMessage('Please provide your name and email address.');
+    if (!customerName.trim()) {
+      setErrorMessage('Please provide recipient name.');
       return;
     }
 
-    if (!address.trim() || !city.trim() || !postalCode.trim()) {
-      setErrorMessage('Please provide your complete delivery address.');
+    // Clean phone number (must be 10-digit Indian number)
+    const cleanPhone = phone.replace(/\D/g, '').replace(/^91/, '');
+    if (!/^[6-9]\d{9}$/.test(cleanPhone)) {
+      setErrorMessage('Please provide a valid 10-digit Indian mobile number (e.g., 9876543210).');
       return;
+    }
+
+    if (fulfilment === 'DELIVERY') {
+      if (!line1.trim()) {
+        setErrorMessage('Street address is required for Home Delivery.');
+        return;
+      }
+      if (!city.trim()) {
+        setErrorMessage('City is required for Home Delivery.');
+        return;
+      }
+      const cleanPin = pincode.trim();
+      if (!/^\d{6}$/.test(cleanPin)) {
+        setErrorMessage('Please provide a valid 6-digit Indian PIN code (e.g., 560034).');
+        return;
+      }
     }
 
     if (items.length === 0) {
@@ -67,55 +85,158 @@ export default function CheckoutModal({ isOpen, onClose, onOrderSuccess }: Check
     setLoading(true);
 
     try {
-      const orderPayload = {
-        customerName: customerName.trim(),
-        customerEmail: customerEmail.trim(),
-        shippingAddress: {
-          address: address.trim(),
-          city: city.trim(),
-          postalCode: postalCode.trim(),
-          country: country.trim(),
-          notes: notes.trim(),
-        },
-        paymentMethod,
-        items: items.map((i) => ({
-          productId: i.product.id,
-          quantity: i.quantity,
-        })),
-      };
-
-      const res = await fetch('/api/orders', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(orderPayload),
-      });
-
-      const data = await res.json();
-
-      if (!res.ok || !data.success) {
-        setErrorMessage(data.message || 'Failed to place order. Please try again.');
-        setLoading(false);
-        return;
+      // 1. Ensure user has a valid session token (creates guest session if not logged in)
+      let token = getStoredToken();
+      if (!token) {
+        const guestSession = await backend.createSession(customerName.trim());
+        token = guestSession.token;
       }
 
-      // Order successfully verified and placed in real backend!
-      setConfirmedOrder(data.order);
-      clearCart();
-      onOrderSuccess(data.order);
-
-      // Trigger botanical celebratory confetti
+      // 2. Synchronize frontend items with backend cart
       try {
+        await backend.clearCart();
+        for (const item of items) {
+          await backend.addToCart(item.product.productId, selectedBranch.id, item.quantity);
+        }
+      } catch (cartErr) {
+        console.warn('Backend cart sync note:', cartErr);
+      }
+
+      // 3. Dispatch real backend checkout
+      const addressPayload = fulfilment === 'DELIVERY'
+        ? {
+            name: customerName.trim(),
+            phone: cleanPhone,
+            line1: line1.trim(),
+            city: city.trim(),
+            pincode: pincode.trim(),
+            lat: selectedBranch.lat || 12.9352,
+            lng: selectedBranch.lng || 77.6245,
+          }
+        : undefined;
+
+      const checkoutRes = await backend.checkout({
+        fulfilment,
+        branch_id: selectedBranch.id,
+        address: addressPayload,
+      });
+
+      const order = checkoutRes.order;
+      if (!order || !order.id) {
+        throw new Error('Order creation failed on backend.');
+      }
+
+      // 4. Initiate payment flow
+      let paymentRes;
+      try {
+        paymentRes = await backend.createPayment(order.id);
+      } catch (payErr: any) {
+        // If razorpay mode but payment creation failed, inspect
+        throw payErr;
+      }
+
+      const isMock = paymentRes.provider === 'mock' || (paymentRes.provider_order_id && paymentRes.provider_order_id.startsWith('mock_'));
+      setIsTestMode(Boolean(isMock));
+
+      if (isMock) {
+        // Simulated / Test mode: complete payment directly
+        try {
+          await backend.payOrder(order.id);
+        } catch {
+          // If payOrder route was disabled or replayed, it's safe
+        }
+        order.status = 'CONFIRMED';
+        setConfirmedOrder(order);
+        clearCart();
+        onOrderSuccess(order);
+
+        // Fetch live delivery tracking
+        try {
+          const track = await backend.getOrderTracking(order.id);
+          setTrackingInfo(track);
+        } catch {
+          // Ignore if pickup
+        }
+
         confetti({
           particleCount: 80,
           spread: 70,
           origin: { y: 0.6 },
           colors: ['#183D2B', '#687D4D', '#A8B59A', '#B68B63'],
         });
-      } catch {
-        // ignore
+      } else {
+        // Real Razorpay Checkout integration
+        if (typeof window !== 'undefined') {
+          // Load Razorpay script if not already loaded
+          if (!(window as any).Razorpay) {
+            await new Promise((resolve, reject) => {
+              const script = document.createElement('script');
+              script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+              script.onload = resolve;
+              script.onerror = reject;
+              document.body.appendChild(script);
+            });
+          }
+
+          const rzpKey = paymentRes.key_id || process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID;
+          const options = {
+            key: rzpKey,
+            amount: paymentRes.amount_paise,
+            currency: paymentRes.currency || 'INR',
+            name: 'StockSure Botanical Nursery',
+            description: `Order #${order.id.slice(0, 8)}`,
+            order_id: paymentRes.provider_order_id,
+            handler: async function (response: any) {
+              try {
+                await backend.verifyPayment(order.id, {
+                  provider_order_id: response.razorpay_order_id || paymentRes.provider_order_id,
+                  provider_payment_id: response.razorpay_payment_id,
+                  signature: response.razorpay_signature,
+                });
+                order.status = 'CONFIRMED';
+                setConfirmedOrder(order);
+                clearCart();
+                onOrderSuccess(order);
+
+                try {
+                  const track = await backend.getOrderTracking(order.id);
+                  setTrackingInfo(track);
+                } catch {
+                  // ignore
+                }
+
+                confetti({
+                  particleCount: 80,
+                  spread: 70,
+                  origin: { y: 0.6 },
+                  colors: ['#183D2B', '#687D4D', '#A8B59A', '#B68B63'],
+                });
+              } catch (verifyErr: any) {
+                setErrorMessage(verifyErr.message || 'Payment verification failed.');
+              }
+            },
+            prefill: {
+              name: customerName,
+              email: customerEmail,
+              contact: cleanPhone,
+            },
+            theme: {
+              color: '#183D2B',
+            },
+            modal: {
+              ondismiss: function () {
+                setLoading(false);
+                setErrorMessage('Payment window was dismissed. You can complete payment anytime.');
+              },
+            },
+          };
+
+          const rzp = new (window as any).Razorpay(options);
+          rzp.open();
+        }
       }
-    } catch {
-      setErrorMessage('A network error occurred while submitting your order.');
+    } catch (err: any) {
+      setErrorMessage(err.message || 'Failed to place order through backend.');
     } finally {
       setLoading(false);
     }
@@ -124,7 +245,7 @@ export default function CheckoutModal({ isOpen, onClose, onOrderSuccess }: Check
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-forest/60 backdrop-blur-md animate-fade-in">
       <div
-        className="relative w-full max-w-3xl max-h-[92vh] overflow-y-auto glass-panel rounded-modal bg-cream border border-forest/15 shadow-elevated p-6 sm:p-10"
+        className="relative w-full max-w-2xl max-h-[92vh] overflow-y-auto rounded-modal bg-cream border border-forest/15 shadow-elevated p-6 sm:p-8"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Close Button */}
@@ -144,37 +265,42 @@ export default function CheckoutModal({ isOpen, onClose, onOrderSuccess }: Check
             </div>
 
             <div className="space-y-2">
-              <span className="text-xs uppercase tracking-widest font-bold text-moss">
-                Order Confirmed
-              </span>
+              <div className="inline-flex items-center gap-2">
+                <span className="text-xs uppercase tracking-widest font-bold text-moss">
+                  Order Confirmed
+                </span>
+                {isTestMode && (
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300">
+                    TEST MODE
+                  </span>
+                )}
+              </div>
               <h2 className="editorial-serif text-3xl sm:text-4xl font-light text-forest">
-                Thank you, {confirmedOrder.customerName}
+                Thank you, {customerName}!
               </h2>
               <p className="text-xs sm:text-sm text-darktext/70 max-w-md mx-auto">
-                We have registered order <strong className="text-forest">#{confirmedOrder.id}</strong> in our
-                greenhouse system. Our master growers are carefully inspecting and preparing your
-                specimens for acclimated transit.
+                Your order <strong className="text-forest font-mono">#{confirmedOrder.id}</strong> has been confirmed and scheduled with StockSure {selectedBranch.name}.
               </p>
             </div>
 
             {/* Receipt Summary Card */}
-            <div className="text-left p-6 rounded-panel bg-cream-light/80 border border-forest/10 shadow-soft space-y-4 max-w-lg mx-auto text-xs">
+            <div className="text-left p-6 rounded-panel bg-white/80 border border-forest/10 shadow-soft space-y-4 max-w-lg mx-auto text-xs">
               <div className="flex justify-between border-b border-forest/10 pb-3 font-semibold text-forest">
-                <span>Order Reference</span>
-                <span className="font-mono">{confirmedOrder.id}</span>
+                <span>Branch Fulfillment</span>
+                <span>{selectedBranch.name} ({fulfilment})</span>
               </div>
 
               <div className="space-y-2">
                 <span className="font-bold text-darktext/70 uppercase text-[10px] tracking-wider block">
-                  Botanical Specimens:
+                  Items Reserved:
                 </span>
-                {confirmedOrder.items.map((item) => (
-                  <div key={item.productId} className="flex justify-between items-center text-darktext">
+                {items.map((item) => (
+                  <div key={item.product.id} className="flex justify-between items-center text-darktext">
                     <span className="truncate max-w-[240px]">
-                      {item.quantity}x {item.name}
+                      {item.quantity}x {item.product.name}
                     </span>
                     <span className="font-serif font-bold text-forest">
-                      ${(item.price * item.quantity).toFixed(2)}
+                      ₹{item.product.price * item.quantity}
                     </span>
                   </div>
                 ))}
@@ -183,39 +309,55 @@ export default function CheckoutModal({ isOpen, onClose, onOrderSuccess }: Check
               <div className="border-t border-forest/10 pt-3 space-y-1">
                 <div className="flex justify-between text-darktext/70">
                   <span>Subtotal</span>
-                  <span>${confirmedOrder.subtotal.toFixed(2)}</span>
+                  <span>₹{subtotal}</span>
                 </div>
                 <div className="flex justify-between text-darktext/70">
-                  <span>Insulated Delivery</span>
+                  <span>Delivery Charges</span>
                   <span className="text-moss font-semibold">
-                    {confirmedOrder.shippingCost === 0
-                      ? 'Complimentary'
-                      : `$${confirmedOrder.shippingCost.toFixed(2)}`}
+                    {shippingCost === 0 ? 'FREE' : `₹${shippingCost}`}
                   </span>
                 </div>
                 <div className="flex justify-between text-sm font-bold text-forest pt-1">
-                  <span>Total Paid</span>
-                  <span className="font-serif text-base">${confirmedOrder.total.toFixed(2)}</span>
+                  <span>Total Amount Paid</span>
+                  <span className="font-serif text-base">₹{total}</span>
                 </div>
               </div>
 
-              <div className="p-3 rounded-[14px] bg-forest/5 text-darktext/70 space-y-0.5">
-                <p>
-                  <strong>Destination:</strong> {confirmedOrder.shippingAddress.address},{' '}
-                  {confirmedOrder.shippingAddress.city} {confirmedOrder.shippingAddress.postalCode}
-                </p>
-                <p>
-                  <strong>Dispatched:</strong> 2-3 Business Days in Climate Pouch
-                </p>
-              </div>
+              {/* Delivery Tracking Details if available */}
+              {trackingInfo && (
+                <div className="p-3.5 rounded-[14px] bg-forest/5 text-darktext space-y-1 border border-forest/10">
+                  <div className="flex items-center justify-between font-semibold text-forest">
+                    <span>Delivery Status:</span>
+                    <span className="uppercase text-[10px] px-2 py-0.5 rounded-full bg-forest text-cream font-mono">
+                      {trackingInfo.status}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-darktext/70">
+                    Estimated Transit: {trackingInfo.eta_minutes || 25} mins
+                  </p>
+                  {trackingInfo.handover_code && (
+                    <p className="text-[11px] font-mono font-bold text-forest">
+                      Handover Code: {trackingInfo.handover_code}
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
 
-            <button
-              onClick={onClose}
-              className="px-8 py-3.5 rounded-button bg-forest text-cream font-semibold text-xs uppercase tracking-wider hover:bg-forest-700 transition-colors shadow-soft"
-            >
-              Return to Sanctuary
-            </button>
+            <div className="flex justify-center gap-4">
+              <a
+                href="/profile"
+                className="px-6 py-3 rounded-button bg-forest text-cream font-semibold text-xs uppercase tracking-wider hover:bg-forest-700 transition-colors shadow-soft"
+              >
+                View in Profile
+              </a>
+              <button
+                onClick={onClose}
+                className="px-6 py-3 rounded-button bg-white text-forest border border-forest/20 font-semibold text-xs uppercase tracking-wider hover:bg-forest/5 transition-colors"
+              >
+                Continue Browsing
+              </button>
+            </div>
           </div>
         ) : (
           /* Checkout Form */
@@ -224,11 +366,11 @@ export default function CheckoutModal({ isOpen, onClose, onOrderSuccess }: Check
               <div className="flex items-center gap-2 mb-1">
                 <Sprout className="w-5 h-5 text-moss" />
                 <span className="text-xs uppercase tracking-widest font-bold text-moss">
-                  White-Glove Greenhouse Checkout
+                  StockSure Greenhouse Checkout
                 </span>
               </div>
-              <h2 className="editorial-serif text-3xl sm:text-4xl font-light text-forest">
-                Complete Your Botanical Order
+              <h2 className="editorial-serif text-2xl sm:text-3xl font-light text-forest">
+                Complete Your Order
               </h2>
             </div>
 
@@ -239,190 +381,178 @@ export default function CheckoutModal({ isOpen, onClose, onOrderSuccess }: Check
               </div>
             )}
 
-            <form onSubmit={handlePlaceOrder} className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* Left Column: Customer & Delivery details */}
-                <div className="space-y-4">
-                  <h3 className="text-xs font-bold uppercase tracking-wider text-forest border-b border-forest/10 pb-2">
-                    1. Recipient Details
-                  </h3>
+            <form onSubmit={handlePlaceOrder} className="space-y-5">
+              {/* Fulfilment Selector */}
+              <div>
+                <label className="text-[11px] font-bold uppercase tracking-wider text-darktext/80 block mb-2">
+                  Fulfillment Method
+                </label>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setFulfilment('DELIVERY')}
+                    className={`p-3 rounded-xl border text-xs font-semibold flex items-center justify-center gap-2 transition-all ${
+                      fulfilment === 'DELIVERY'
+                        ? 'bg-forest text-cream border-forest shadow-sm'
+                        : 'bg-white text-forest border-forest/20 hover:bg-forest/5'
+                    }`}
+                  >
+                    <Truck className="w-4 h-4" />
+                    <span>Home Delivery</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setFulfilment('PICKUP')}
+                    className={`p-3 rounded-xl border text-xs font-semibold flex items-center justify-center gap-2 transition-all ${
+                      fulfilment === 'PICKUP'
+                        ? 'bg-forest text-cream border-forest shadow-sm'
+                        : 'bg-white text-forest border-forest/20 hover:bg-forest/5'
+                    }`}
+                  >
+                    <Store className="w-4 h-4" />
+                    <span>Store Pickup</span>
+                  </button>
+                </div>
+              </div>
 
+              {/* Branch Selector */}
+              <div>
+                <label className="text-[11px] font-bold uppercase tracking-wider text-darktext/80 block mb-1">
+                  Serving Branch
+                </label>
+                <select
+                  value={selectedBranch.id}
+                  onChange={(e) => {
+                    const found = branches.find((b) => b.id === Number(e.target.value));
+                    if (found) setSelectedBranch(found);
+                  }}
+                  className="w-full px-3.5 py-2.5 rounded-input bg-white border border-forest/20 text-xs text-forest focus:outline-none focus:border-forest"
+                >
+                  {branches.map((b) => (
+                    <option key={b.id} value={b.id}>
+                      {b.name} ({b.city})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Recipient Details */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-[11px] font-bold uppercase tracking-wider text-darktext/80 block">
+                    Full Name <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={customerName}
+                    onChange={(e) => setCustomerName(e.target.value)}
+                    placeholder="Priya Sharma"
+                    className="w-full px-3.5 py-2.5 rounded-input bg-white border border-forest/20 text-xs text-forest focus:outline-none focus:border-forest"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[11px] font-bold uppercase tracking-wider text-darktext/80 block">
+                    Phone Number (10 digits) <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="tel"
+                    required
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    placeholder="9876543210"
+                    className="w-full px-3.5 py-2.5 rounded-input bg-white border border-forest/20 text-xs text-forest focus:outline-none focus:border-forest"
+                  />
+                </div>
+              </div>
+
+              {/* Delivery Address Details */}
+              {fulfilment === 'DELIVERY' && (
+                <div className="space-y-3 pt-2 border-t border-forest/10">
                   <div className="space-y-1">
-                    <label className="text-[11px] font-bold uppercase text-darktext/80 block">
-                      Full Name
+                    <label className="text-[11px] font-bold uppercase tracking-wider text-darktext/80 block">
+                      Street Address <span className="text-red-500">*</span>
                     </label>
                     <input
                       type="text"
-                      value={customerName}
-                      onChange={(e) => setCustomerName(e.target.value)}
-                      placeholder="Elena Vance"
-                      className="w-full px-3.5 py-2.5 rounded-input bg-cream-light/80 border border-forest/15 text-forest text-xs focus:outline-none focus:border-forest"
                       required
-                    />
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="text-[11px] font-bold uppercase text-darktext/80 block">
-                      Email for Order Updates & Care Guide
-                    </label>
-                    <input
-                      type="email"
-                      value={customerEmail}
-                      onChange={(e) => setCustomerEmail(e.target.value)}
-                      placeholder="elena@example.com"
-                      className="w-full px-3.5 py-2.5 rounded-input bg-cream-light/80 border border-forest/15 text-forest text-xs focus:outline-none focus:border-forest"
-                      required
-                    />
-                  </div>
-
-                  <h3 className="text-xs font-bold uppercase tracking-wider text-forest border-b border-forest/10 pb-2 pt-2">
-                    2. Sanctuary Delivery Address
-                  </h3>
-
-                  <div className="space-y-1">
-                    <label className="text-[11px] font-bold uppercase text-darktext/80 block">
-                      Street Address
-                    </label>
-                    <input
-                      type="text"
-                      value={address}
-                      onChange={(e) => setAddress(e.target.value)}
-                      placeholder="42 Botanical Gardens Mews"
-                      className="w-full px-3.5 py-2.5 rounded-input bg-cream-light/80 border border-forest/15 text-forest text-xs focus:outline-none focus:border-forest"
-                      required
+                      value={line1}
+                      onChange={(e) => setLine1(e.target.value)}
+                      placeholder="Flat/House, Street, Area"
+                      className="w-full px-3.5 py-2.5 rounded-input bg-white border border-forest/20 text-xs text-forest focus:outline-none focus:border-forest"
                     />
                   </div>
 
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1">
-                      <label className="text-[11px] font-bold uppercase text-darktext/80 block">
-                        City / Town
+                      <label className="text-[11px] font-bold uppercase tracking-wider text-darktext/80 block">
+                        City <span className="text-red-500">*</span>
                       </label>
                       <input
                         type="text"
+                        required
                         value={city}
                         onChange={(e) => setCity(e.target.value)}
-                        placeholder="Bath"
-                        className="w-full px-3.5 py-2.5 rounded-input bg-cream-light/80 border border-forest/15 text-forest text-xs focus:outline-none focus:border-forest"
-                        required
+                        placeholder="Bengaluru"
+                        className="w-full px-3.5 py-2.5 rounded-input bg-white border border-forest/20 text-xs text-forest focus:outline-none focus:border-forest"
                       />
                     </div>
+
                     <div className="space-y-1">
-                      <label className="text-[11px] font-bold uppercase text-darktext/80 block">
-                        Postal Code
+                      <label className="text-[11px] font-bold uppercase tracking-wider text-darktext/80 block">
+                        PIN Code <span className="text-red-500">*</span>
                       </label>
                       <input
                         type="text"
-                        value={postalCode}
-                        onChange={(e) => setPostalCode(e.target.value)}
-                        placeholder="BA1 2XW"
-                        className="w-full px-3.5 py-2.5 rounded-input bg-cream-light/80 border border-forest/15 text-forest text-xs focus:outline-none focus:border-forest"
                         required
+                        maxLength={6}
+                        value={pincode}
+                        onChange={(e) => setPincode(e.target.value)}
+                        placeholder="560034"
+                        className="w-full px-3.5 py-2.5 rounded-input bg-white border border-forest/20 text-xs text-forest focus:outline-none focus:border-forest"
                       />
                     </div>
                   </div>
-
-                  <div className="space-y-1">
-                    <label className="text-[11px] font-bold uppercase text-darktext/80 block">
-                      Courier Delivery Notes
-                    </label>
-                    <input
-                      type="text"
-                      value={notes}
-                      onChange={(e) => setNotes(e.target.value)}
-                      placeholder="e.g. Leave in porch / Ring front bell"
-                      className="w-full px-3.5 py-2.5 rounded-input bg-cream-light/80 border border-forest/15 text-forest text-xs focus:outline-none focus:border-forest"
-                    />
-                  </div>
                 </div>
+              )}
 
-                {/* Right Column: Order Summary & Payment method */}
-                <div className="space-y-4 flex flex-col justify-between">
-                  <div>
-                    <h3 className="text-xs font-bold uppercase tracking-wider text-forest border-b border-forest/10 pb-2">
-                      3. Order Summary ({items.length} items)
-                    </h3>
-
-                    <div className="max-h-48 overflow-y-auto space-y-2 py-3 pr-1">
-                      {items.map(({ product, quantity }) => (
-                        <div
-                          key={product.id}
-                          className="flex items-center justify-between text-xs py-1 border-b border-forest/5"
-                        >
-                          <div className="flex items-center gap-2">
-                            <span className="w-5 h-5 rounded-full bg-forest/10 font-bold text-[10px] flex items-center justify-center text-forest">
-                              {quantity}
-                            </span>
-                            <span className="font-serif font-medium text-forest truncate max-w-[160px]">
-                              {product.name}
-                            </span>
-                          </div>
-                          <span className="font-serif font-bold text-forest">
-                            ${(product.price * quantity).toFixed(2)}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-
-                    <div className="space-y-1.5 text-xs text-darktext/80 pt-3 border-t border-forest/10">
-                      <div className="flex justify-between">
-                        <span>Subtotal</span>
-                        <span className="font-serif font-bold">${subtotal.toFixed(2)}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span>Insulated Packaging</span>
-                        <span className="text-moss font-semibold">
-                          {shippingCost === 0 ? 'Free' : `$${shippingCost.toFixed(2)}`}
-                        </span>
-                      </div>
-                      <div className="flex justify-between text-base font-bold text-forest pt-2 border-t border-forest/10">
-                        <span>Total Due</span>
-                        <span className="font-serif text-xl font-bold">${total.toFixed(2)}</span>
-                      </div>
-                    </div>
-
-                    {/* Payment Simulation selector */}
-                    <div className="mt-4 space-y-2">
-                      <label className="text-[11px] font-bold uppercase text-darktext/80 block">
-                        Payment Method
-                      </label>
-                      <div className="grid grid-cols-2 gap-2 text-xs">
-                        {['Credit Card / Apple Pay', 'Direct Bank Wire'].map((m) => (
-                          <button
-                            key={m}
-                            type="button"
-                            onClick={() => setPaymentMethod(m)}
-                            className={`p-2.5 rounded-[14px] border text-left font-medium transition-all ${
-                              paymentMethod === m
-                                ? 'bg-forest text-cream border-forest'
-                                : 'bg-cream-light/60 border-forest/15 text-forest hover:bg-forest/5'
-                            }`}
-                          >
-                            <span className="block text-[11px]">{m}</span>
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Submission Button */}
-                  <div className="space-y-2 pt-4">
-                    <button
-                      type="submit"
-                      disabled={loading || items.length === 0}
-                      className="w-full py-4 rounded-button bg-forest text-cream font-semibold text-xs uppercase tracking-wider hover:bg-forest-700 transition-all duration-300 shadow-soft hover:shadow-elevated flex items-center justify-center gap-2 disabled:opacity-50 active:scale-98"
-                    >
-                      <span>{loading ? 'Verifying Greenhouse Stock...' : `Place Order · $${total.toFixed(2)}`}</span>
-                      <ArrowRight className="w-4 h-4" />
-                    </button>
-
-                    <div className="flex items-center justify-center gap-1.5 text-[10px] text-darktext/60">
-                      <ShieldCheck className="w-3.5 h-3.5 text-moss" />
-                      <span>Stock verified in real-time · SSL encrypted checkout</span>
-                    </div>
-                  </div>
+              {/* Cart Summary Snippet */}
+              <div className="p-4 rounded-xl bg-forest/5 border border-forest/10 text-xs space-y-1">
+                <div className="flex justify-between text-darktext/80">
+                  <span>Items ({items.reduce((s, i) => s + i.quantity, 0)})</span>
+                  <span>₹{subtotal}</span>
+                </div>
+                <div className="flex justify-between text-darktext/80">
+                  <span>Delivery Charges</span>
+                  <span className="text-moss font-semibold">
+                    {shippingCost === 0 ? 'FREE' : `₹${shippingCost}`}
+                  </span>
+                </div>
+                <div className="flex justify-between font-bold text-sm text-forest pt-1 border-t border-forest/10">
+                  <span>Final Total</span>
+                  <span className="font-serif">₹{total}</span>
                 </div>
               </div>
+
+              {/* Submit Button */}
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full py-3.5 rounded-button bg-forest text-cream font-semibold text-xs uppercase tracking-wider hover:bg-forest-700 transition-all shadow-soft flex items-center justify-center gap-2 disabled:opacity-50"
+              >
+                {loading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>Reserving Inventory & Contacting Backend...</span>
+                  </>
+                ) : (
+                  <>
+                    <span>Confirm & Place Order</span>
+                    <ArrowRight className="w-4 h-4" />
+                  </>
+                )}
+              </button>
             </form>
           </div>
         )}

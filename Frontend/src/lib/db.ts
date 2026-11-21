@@ -71,8 +71,8 @@ function initStore(): DBStore {
   const demoSalt = crypto.randomBytes(16).toString('hex');
   const demoUser: User = {
     id: 'usr_demo_01',
-    name: 'Elena Vance',
-    email: 'elena@verdantbotanicals.com',
+    name: 'Priya Sharma',
+    email: 'priya@stocksure.in',
     salt: demoSalt,
     passwordHash: hashPassword('plantlover2026', demoSalt),
     createdAt: new Date().toISOString(),

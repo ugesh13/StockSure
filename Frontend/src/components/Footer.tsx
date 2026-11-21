@@ -89,10 +89,10 @@ export default function Footer({ onSelectCategory }: FooterProps) {
               </div>
               <div className="flex flex-col">
                 <span className="font-serif text-2xl font-bold tracking-widest leading-none">
-                  VERDANT
+                  StockSure
                 </span>
                 <span className="text-[9px] uppercase tracking-[0.25em] text-sage-light font-semibold mt-0.5">
-                  Botanical Sanctuary
+                  Botanical Nursery
                 </span>
               </div>
             </div>
@@ -224,12 +224,12 @@ export default function Footer({ onSelectCategory }: FooterProps) {
             </h4>
             <div className="space-y-2 text-xs text-cream/80 leading-relaxed">
               <p>Greenhouse Studio No. 4</p>
-              <p>Cotswolds Botanical Way, UK</p>
-              <p className="pt-2 text-cream">concierge@verdantbotanicals.com</p>
-              <p>+44 (0) 1225 849 320</p>
+              <p>Koramangala 5th Block, Bengaluru</p>
+              <p className="pt-2 text-cream">care@stocksure.in</p>
+              <p>+91 80 4567 8900</p>
               <div className="flex items-center gap-1.5 pt-2 text-sage-light font-semibold">
                 <ShieldCheck className="w-4 h-4" />
-                <span>Certified B-Corp Pending</span>
+                <span>Certified Live Stock Verified</span>
               </div>
             </div>
           </div>
@@ -237,7 +237,7 @@ export default function Footer({ onSelectCategory }: FooterProps) {
 
         {/* Bottom Legal bar */}
         <div className="pt-8 border-t border-cream/10 flex flex-col sm:flex-row items-center justify-between text-xs text-cream/60 gap-4">
-          <p>© 2026 VERDANT Botanical Sanctuary Ltd. All rights reserved.</p>
+          <p>© 2026 StockSure Technologies Pvt Ltd. All rights reserved.</p>
           <div className="flex items-center gap-6">
             <a href="#" className="hover:text-cream">Privacy Policy</a>
             <a href="#" className="hover:text-cream">Terms of Botanical Service</a>

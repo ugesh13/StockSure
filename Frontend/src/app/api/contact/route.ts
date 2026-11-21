@@ -13,7 +13,7 @@ export async function POST(req: Request) {
     }
 
     // Log the botanical inquiry to conservatory queue
-    console.log('[Verdant Conservatory Inquiry Received]:', {
+    console.log('[StockSure Inquiry Received]:', {
       name,
       email,
       phone: phone || 'N/A',

@@ -27,7 +27,7 @@ export default function BotanicalStory() {
             <div className="col-span-8 relative h-[440px] sm:h-[520px] rounded-editorial overflow-hidden shadow-elevated border border-forest/10">
               <Image
                 src="https://images.unsplash.com/photo-1592150621744-aca64f48394a?auto=format&fit=crop&w=900&q=80"
-                alt="Verdant botanical greenhouse artisan cultivating plants"
+                alt="StockSure botanical greenhouse artisan cultivating plants"
                 fill
                 sizes="(max-width: 768px) 100vw, 40vw"
                 className="object-cover"
@@ -75,7 +75,7 @@ export default function BotanicalStory() {
             </h3>
             <p className="text-sm text-darktext/80 leading-relaxed font-sans">
               Founded on the belief that modern interiors deserve more than short-lived mass-market
-              foliage, Verdant partners with generational growers and botanical horticulturists.
+              foliage, StockSure partners with generational growers and botanical horticulturists.
             </p>
             <p className="text-sm text-darktext/70 leading-relaxed font-sans">
               Every specimen spends a minimum of four weeks in our domestic acclimation chambers

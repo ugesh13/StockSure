@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import Image from 'next/image';
 import { X, Star, Sun, Droplets, PawPrint, Ruler, ShoppingBag, Plus, Minus, Check } from 'lucide-react';
-import { Product } from '@/data/products';
+import { Product, formatImageUrl } from '@/lib/backend';
 import { useCart } from '@/context/CartContext';
 
 interface QuickViewModalProps {
@@ -12,11 +12,14 @@ interface QuickViewModalProps {
 }
 
 export default function QuickViewModal({ product, onClose }: QuickViewModalProps) {
-  const { addToCart } = useCart();
+  const { addToCart, selectedBranch, getProductStockAtBranch } = useCart();
   const [quantity, setQuantity] = useState(1);
   const [added, setAdded] = useState(false);
 
   if (!product) return null;
+
+  const stockInfo = getProductStockAtBranch(product);
+  const availableStock = stockInfo.available;
 
   const handleAdd = () => {
     addToCart(product, quantity);
@@ -27,7 +30,7 @@ export default function QuickViewModal({ product, onClose }: QuickViewModalProps
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-forest/50 backdrop-blur-md animate-fade-in">
       <div
-        className="relative w-full max-w-4xl max-h-[92vh] overflow-y-auto glass-panel rounded-modal bg-cream border border-forest/15 shadow-elevated p-6 sm:p-8"
+        className="relative w-full max-w-4xl max-h-[92vh] overflow-y-auto rounded-modal bg-cream border border-forest/15 shadow-elevated p-6 sm:p-8"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Close Button */}
@@ -43,7 +46,7 @@ export default function QuickViewModal({ product, onClose }: QuickViewModalProps
           {/* Product Image */}
           <div className="md:col-span-6 relative h-80 sm:h-[460px] rounded-[24px] overflow-hidden bg-cream-dark/40 border border-forest/10">
             <Image
-              src={product.imageUrl}
+              src={formatImageUrl(product.imageUrl)}
               alt={product.name}
               fill
               priority
@@ -52,7 +55,7 @@ export default function QuickViewModal({ product, onClose }: QuickViewModalProps
             />
             {product.bestseller && (
               <span className="absolute top-4 left-4 text-[10px] uppercase font-bold tracking-wider px-3 py-1 rounded-full bg-forest text-cream shadow-sm">
-                Sanctuary Best Seller
+                Sanctuary Favorite
               </span>
             )}
           </div>
@@ -80,20 +83,20 @@ export default function QuickViewModal({ product, onClose }: QuickViewModalProps
 
               {/* Price & Stock */}
               <div className="flex items-center gap-3 pt-2">
-                <span className="font-serif text-3xl font-bold text-forest">${product.price}</span>
+                <span className="font-serif text-3xl font-bold text-forest">₹{product.price}</span>
                 {product.originalPrice && (
                   <span className="text-sm text-darktext/40 line-through">
-                    ${product.originalPrice}
+                    ₹{product.originalPrice}
                   </span>
                 )}
                 <span
                   className={`text-xs font-semibold px-2.5 py-0.5 rounded-full ${
-                    product.stock > 0
+                    availableStock > 0
                       ? 'bg-moss/10 text-moss'
                       : 'bg-red-100 text-red-700'
                   }`}
                 >
-                  {product.stock > 0 ? `${product.stock} in stock` : 'Out of Stock'}
+                  {availableStock > 0 ? `${availableStock} in stock at ${selectedBranch.name}` : 'Out of Stock'}
                 </span>
               </div>
             </div>
@@ -154,8 +157,8 @@ export default function QuickViewModal({ product, onClose }: QuickViewModalProps
                   </button>
                   <span className="w-10 text-center font-bold text-sm text-forest">{quantity}</span>
                   <button
-                    onClick={() => setQuantity((q) => Math.min(product.stock, q + 1))}
-                    disabled={quantity >= product.stock}
+                    onClick={() => setQuantity((q) => Math.min(Math.max(1, availableStock), q + 1))}
+                    disabled={quantity >= availableStock}
                     className="p-1 text-forest hover:bg-forest/10 rounded-full disabled:opacity-30"
                     aria-label="Increase quantity"
                   >
@@ -165,9 +168,9 @@ export default function QuickViewModal({ product, onClose }: QuickViewModalProps
 
                 <button
                   onClick={handleAdd}
-                  disabled={product.stock <= 0}
+                  disabled={availableStock <= 0}
                   className={`flex-1 py-3.5 px-6 rounded-button font-semibold text-sm flex items-center justify-center gap-2 transition-all duration-300 shadow-soft ${
-                    product.stock <= 0
+                    availableStock <= 0
                       ? 'bg-forest/20 text-forest/40 cursor-not-allowed'
                       : added
                       ? 'bg-moss text-cream'
@@ -182,7 +185,7 @@ export default function QuickViewModal({ product, onClose }: QuickViewModalProps
                   ) : (
                     <>
                       <ShoppingBag className="w-4 h-4" />
-                      <span>Add to Cart · ${(product.price * quantity).toFixed(2)}</span>
+                      <span>Add to Cart · ₹{product.price * quantity}</span>
                     </>
                   )}
                 </button>

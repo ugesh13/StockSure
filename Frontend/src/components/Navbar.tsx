@@ -75,10 +75,10 @@ export default function Navbar({ onSelectCategory, onOpenSearch, onOpenQuiz }: N
             </div>
             <div className="flex flex-col">
               <span className="font-serif text-2xl font-bold tracking-widest text-forest leading-none">
-                VERDANT
+                StockSure
               </span>
               <span className="text-[9px] uppercase tracking-[0.25em] text-moss font-semibold mt-0.5">
-                Botanical Sanctuary
+                Botanical Nursery
               </span>
             </div>
           </a>

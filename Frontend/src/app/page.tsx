@@ -8,14 +8,10 @@ import {
   useTransform,
   useSpring,
   AnimatePresence,
-  useMotionValueEvent,
 } from 'framer-motion';
 import DynamicIslandNavbar from '@/components/DynamicIslandNavbar';
 import AnimatedHeroLetters from '@/components/AnimatedHeroLetters';
 import {
-  Sprout,
-  Sun,
-  ShieldCheck,
   Leaf,
   MapPin,
   Clock,
@@ -29,57 +25,57 @@ import {
   Navigation,
   Loader2,
   AlertCircle,
-  Building2,
-  Layers,
   Sparkles,
   X,
-  Play,
   Volume2,
   VolumeX,
 } from 'lucide-react';
+import { useCart } from '@/context/CartContext';
+import { backend } from '@/lib/backend';
+import { CONTACT_EMAIL, CONTACT_PHONE, CONTACT_ADDRESS, CONTACT_HOURS } from '@/config/site';
 
-const BRANCHES = [
+const BANGALORE_BRANCHES = [
   {
-    id: 'flagship',
-    name: 'Sanctuary Glasshouse Flagship',
-    city: 'San Francisco, CA',
-    address: '428 Botanical Way, Conservatory Park, San Francisco, CA 94117',
-    hours: 'Mon – Sat: 9:00 AM – 7:00 PM | Sun: 10:00 AM – 6:00 PM',
-    phone: '+1 (415) 890-4420',
-    email: 'conservatory@verdant-botanicals.com',
-    highlight: 'Full atrium specimen collection, peat-free repotting bar, and consultation pavilion.',
-    image: '/images/branch-sf.jpg',
-    lat: 37.7749,
-    lng: -122.4194,
-    features: ['Peat-Free Repotting Bar', 'Rare Specimen Atrium', 'Private Consultations'],
+    id: 1,
+    name: 'StockSure Koramangala',
+    city: 'Bengaluru',
+    address: '80 Feet Road, 4th Block, Koramangala, Bengaluru, Karnataka 560034',
+    hours: 'Mon – Sat: 8:00 AM – 9:00 PM | Sun: 9:00 AM – 8:00 PM IST',
+    phone: '+91 80 4567 8901',
+    email: 'koramangala@stocksure.in',
+    highlight: 'Full greenhouse specimen collection, peat-free repotting bar, and consultation pavilion.',
+    image: '/images/branch-koramangala.jpg',
+    lat: 12.9352,
+    lng: 77.6245,
+    features: ['Peat-Free Repotting Bar', 'Rare Specimen Atrium', 'Instant Delivery Hub'],
   },
   {
-    id: 'coastal',
-    name: 'Coastal Nursery & Courtyard',
-    city: 'Carmel-by-the-Sea, CA',
-    address: '112 Ocean Pine Lane, Carmel-by-the-Sea, CA 93921',
-    hours: 'Wed – Sun: 10:00 AM – 5:30 PM',
-    phone: '+1 (831) 450-8812',
-    email: 'coastal@verdant-botanicals.com',
-    highlight: 'Outdoor perennials, architectural coastal conifers, and handmade stoneware planters.',
-    image: '/images/branch-carmel.jpg',
-    lat: 36.5552,
-    lng: -121.9233,
-    features: ['Coastal Conifer Terrace', 'Handmade Stoneware Studio', 'Courtyard Garden'],
+    id: 2,
+    name: 'StockSure Indiranagar',
+    city: 'Bengaluru',
+    address: '100 Feet Road, HAL 2nd Stage, Indiranagar, Bengaluru, Karnataka 560038',
+    hours: 'Mon – Sat: 8:00 AM – 9:00 PM | Sun: 9:00 AM – 8:00 PM IST',
+    phone: '+91 80 4567 8902',
+    email: 'indiranagar@stocksure.in',
+    highlight: 'Outdoor perennials, architectural foliage, and handmade stoneware planters.',
+    image: '/images/branch-indiranagar.jpg',
+    lat: 12.9784,
+    lng: 77.6408,
+    features: ['Terrace Garden Studio', 'Handmade Stoneware Studio', 'Express Pickup Counter'],
   },
   {
-    id: 'botanical-hub',
-    name: 'Manhattan Living Conservatory',
-    city: 'New York, NY',
-    address: '74 Mercer Street, SoHo, New York, NY 10012',
-    hours: 'Tue – Sun: 11:00 AM – 8:00 PM',
-    phone: '+1 (212) 670-9930',
-    email: 'soho@verdant-botanicals.com',
-    highlight: 'Indoor low-light acclimated botanicals, architectural ficus specimens, and private delivery fleet.',
-    image: '/images/branch-nyc.jpg',
-    lat: 40.7209,
-    lng: -74.0007,
-    features: ['Low-Light Specialists', 'Architectural Ficus Loft', 'White-Glove Delivery'],
+    id: 3,
+    name: 'StockSure Whitefield',
+    city: 'Bengaluru',
+    address: 'ITPL Main Road, Whitefield, Bengaluru, Karnataka 560066',
+    hours: 'Mon – Sat: 9:00 AM – 9:00 PM | Sun: 10:00 AM – 8:00 PM IST',
+    phone: '+91 80 4567 8903',
+    email: 'whitefield@stocksure.in',
+    highlight: 'Indoor low-light acclimated botanicals, architectural ficus specimens, and express delivery fleet.',
+    image: '/images/branch-whitefield.jpg',
+    lat: 12.9698,
+    lng: 77.7500,
+    features: ['Low-Light Specialists', 'Architectural Ficus Loft', 'Climate-Controlled Dispatch'],
   },
 ];
 
@@ -87,9 +83,10 @@ export default function Home() {
   const { scrollY } = useScroll();
   const [windowHeight, setWindowHeight] = useState(900);
   const [aboutBounds, setAboutBounds] = useState({ top: 900, height: 1100 });
-  const [branchesBounds, setBranchesBounds] = useState({ top: 1800, height: 1200 });
-  const [selectedBranch, setSelectedBranch] = useState(BRANCHES[0]);
-  const [visitedBranchModal, setVisitedBranchModal] = useState<typeof BRANCHES[0] | null>(null);
+  const [branchesList, setBranchesList] = useState(BANGALORE_BRANCHES);
+  const [selectedBranch, setSelectedBranch] = useState(BANGALORE_BRANCHES[0]);
+  const [visitedBranchModal, setVisitedBranchModal] = useState<typeof BANGALORE_BRANCHES[0] | null>(null);
+  const { setSelectedBranch: setCartBranch } = useCart();
 
   // Video card state
   const branchesVideoRef = useRef<HTMLVideoElement | null>(null);
@@ -107,6 +104,34 @@ export default function Home() {
   const [formStatus, setFormStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [errorMessage, setErrorMessage] = useState('');
 
+  // Fetch real branches from backend
+  useEffect(() => {
+    let active = true;
+    async function loadBackendBranches() {
+      try {
+        const res = await backend.getBranches();
+        if (active && res.branches && res.branches.length > 0) {
+          const mapped = res.branches.slice(0, 3).map((b, idx) => ({
+            ...BANGALORE_BRANCHES[idx % BANGALORE_BRANCHES.length],
+            id: b.id,
+            name: b.name,
+            city: b.city,
+            lat: b.lat || BANGALORE_BRANCHES[idx % BANGALORE_BRANCHES.length].lat,
+            lng: b.lng || BANGALORE_BRANCHES[idx % BANGALORE_BRANCHES.length].lng,
+          }));
+          setBranchesList(mapped);
+          setSelectedBranch(mapped[0]);
+        }
+      } catch (e) {
+        console.warn('Could not load branches dynamically', e);
+      }
+    }
+    loadBackendBranches();
+    return () => {
+      active = false;
+    };
+  }, []);
+
   // Measure section bounds
   useEffect(() => {
     const updateBounds = () => {
@@ -122,15 +147,6 @@ export default function Home() {
           height: aboutEl.offsetHeight || 1100,
         });
       }
-
-      const branchesEl = document.getElementById('branches');
-      if (branchesEl) {
-        const rect = branchesEl.getBoundingClientRect();
-        setBranchesBounds({
-          top: rect.top + scroll,
-          height: branchesEl.offsetHeight || 1200,
-        });
-      }
     };
 
     updateBounds();
@@ -143,24 +159,21 @@ export default function Home() {
   }, []);
 
   const springConfig = { stiffness: 95, damping: 22, mass: 0.8 };
-
   const effectiveH = aboutBounds.top > 0 ? aboutBounds.top : windowHeight;
 
   // 1. Hero Section Fade:
-  // Starts fading smoothly as user begins scrolling toward About Us (0 to effectiveH * 0.78)
   const heroFadeRaw = useTransform(scrollY, [0, effectiveH * 0.78], [1, 0]);
   const heroFade = useTransform(heroFadeRaw, (v) => (v < 0.005 ? 0 : v));
 
-  // 2. Subtitle & Button: Fade out smoothly in sync with the hero dissolve
+  // 2. Subtitle & Button Fade
   const subOpacityRaw = useTransform(scrollY, [0, effectiveH * 0.65], [1, 0]);
   const subYRaw = useTransform(scrollY, [0, effectiveH * 0.65], [0, 32]);
   const subOpacity = useSpring(subOpacityRaw, springConfig);
   const subY = useSpring(subYRaw, springConfig);
 
-  // 3. Pointer events guard so faded hero never blocks clicks on About Us
   const heroPointerEvents = useTransform(heroFade, (v) => (v <= 0.01 ? 'none' : 'auto'));
 
-  // 4. Succulent Pot: Reveals inside About Us resting gracefully in circular artwork
+  // 3. Succulent Pot Reveal
   const potOpacityRaw = useTransform(
     scrollY,
     [windowHeight * 0.45, windowHeight * 0.90],
@@ -179,16 +192,17 @@ export default function Home() {
     if (branchesVideoRef.current.paused) {
       branchesVideoRef.current
         .play()
-        .then(() => {
-          setVideoPlaying(true);
-        })
-        .catch(() => {
-          setVideoPlaying(false);
-        });
+        .then(() => setVideoPlaying(true))
+        .catch(() => setVideoPlaying(false));
     } else {
       branchesVideoRef.current.pause();
       setVideoPlaying(false);
     }
+  };
+
+  const handleBranchSelect = (branch: typeof BANGALORE_BRANCHES[0]) => {
+    setSelectedBranch(branch);
+    setCartBranch(branch);
   };
 
   const handleContactSubmit = async (e: React.FormEvent) => {
@@ -230,7 +244,6 @@ export default function Home() {
 
   return (
     <div className="relative min-h-screen w-full select-none bg-[#b8c5ae] overflow-x-clip">
-      {/* Dynamic Floating Glassmorphic Navbar */}
       <DynamicIslandNavbar />
 
       {/* 1. HOME / HERO SECTION (100vh) */}
@@ -241,22 +254,19 @@ export default function Home() {
         }}
         className="relative z-50 w-full h-screen min-h-screen overflow-visible pointer-events-auto"
       >
-        {/* Cinematic Dissolving Background: Poster, Video, and 4 CSS Lighting Overlays */}
         <motion.div
           style={{ opacity: heroFade }}
           className="absolute inset-0 w-full h-full z-0 overflow-hidden pointer-events-none bg-forest-900"
         >
-          {/* High-Resolution Fallback Poster */}
           <Image
             src="/images/hero-poster.jpg"
-            alt="Verdant botanical nursery greenhouse sanctuary"
+            alt="StockSure botanical nursery greenhouse sanctuary"
             fill
             priority
             sizes="100vw"
             className="object-cover object-center filter brightness-[1.04]"
           />
 
-          {/* Video Asset from Reference folder */}
           <video
             autoPlay
             loop
@@ -271,23 +281,14 @@ export default function Home() {
             <source src="/references/nursery_shop.mp4" type="video/mp4" />
           </video>
 
-          {/* NON-DESTRUCTIVE CSS LIGHTING EFFECT OVERLAYS */}
-          {/* 1. Natural sunlight radial gradient from above falling over the plants */}
           <div className="absolute inset-0 z-10 bg-[radial-gradient(ellipse_95%_75%_at_45%_10%,rgba(255,252,238,0.32)_0%,rgba(255,255,255,0.1)_45%,transparent_85%)] pointer-events-none" />
-
-          {/* 2. Soft warm-white daylight exposure enhancement */}
           <div className="absolute inset-0 z-10 bg-gradient-to-b from-amber-50/15 via-transparent to-black/20 pointer-events-none" />
-
-          {/* 3. Soft ambient light bloom over top foliage without washing out details */}
           <div className="absolute top-0 left-0 right-0 h-3/5 z-10 bg-gradient-to-b from-white/12 via-white/5 to-transparent pointer-events-none" />
-
-          {/* 4. Subtle contrast gradient behind right-side text to ensure crisp legibility */}
           <div className="absolute inset-0 z-10 bg-gradient-to-l from-black/45 via-black/15 to-transparent pointer-events-none" />
         </motion.div>
 
-        {/* Unified Hero Text & CTA Flex Column: Heading on top, followed by generous vertical spacing, subtitle, and Shop Now button */}
+        {/* Hero CTA Column */}
         <div className="absolute left-[70.1%] top-[50%] -translate-x-1/2 -translate-y-1/2 z-50 flex flex-col items-center text-center w-full max-w-[340px] sm:max-w-xl lg:max-w-2xl px-4 pointer-events-auto">
-          {/* Main Hero Heading with falling letters */}
           <div className="w-full flex justify-center">
             <AnimatedHeroLetters
               scrollY={scrollY}
@@ -296,7 +297,6 @@ export default function Home() {
             />
           </div>
 
-          {/* Subtitle with generous, clean vertical spacing below the heading */}
           <motion.p
             style={{ opacity: subOpacity, y: subY }}
             className="font-sans font-light text-white/95 text-base sm:text-lg md:text-xl lg:text-2xl tracking-normal drop-shadow-[0_2px_12px_rgba(0,0,0,0.5)] mt-6 sm:mt-8 leading-relaxed max-w-lg select-none"
@@ -304,43 +304,44 @@ export default function Home() {
             Gift a Great Life to Your Home
           </motion.p>
 
-          {/* Shop Now button with proper vertical spacing below the subtitle */}
           <motion.div
             style={{ opacity: subOpacity, y: subY }}
-            className="mt-5 sm:mt-6"
+            className="mt-5 sm:mt-6 flex items-center gap-3"
           >
             <a
-              href="#about"
+              href="/shop"
               className="group relative inline-flex items-center justify-center px-7 sm:px-9 py-2.5 sm:py-3 rounded-[6px] bg-[#5F7355]/70 hover:bg-white text-white hover:text-[#183D2B] border border-white/60 hover:border-white backdrop-blur-md shadow-[0_4px_20px_rgba(24,61,43,0.25)] hover:shadow-[0_8px_28px_rgba(255,255,255,0.3)] hover:-translate-y-0.5 active:translate-y-0 transition-all duration-300 ease-out font-sans font-semibold text-xs sm:text-sm tracking-wider uppercase cursor-pointer overflow-hidden"
             >
-              {/* Subtle shimmer sweep on hover */}
-              <span className="absolute inset-0 w-full h-full bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700 ease-in-out pointer-events-none" />
               <span className="relative z-10">Shop Now</span>
+            </a>
+            <a
+              href="#about"
+              className="inline-flex items-center justify-center px-5 sm:px-6 py-2.5 sm:py-3 rounded-[6px] bg-black/20 hover:bg-black/35 text-white/90 border border-white/30 backdrop-blur-md text-xs sm:text-sm font-semibold tracking-wider uppercase transition-all"
+            >
+              Learn More
             </a>
           </motion.div>
         </div>
       </motion.section>
 
-      {/* 2. ABOUT US SECTION — With Image 1 background & scroll-driven succulent reveal & roll composition */}
+      {/* 2. ABOUT US SECTION */}
       <section
         id="about"
         className="relative z-30 w-full min-h-screen py-24 lg:py-0 lg:h-screen flex items-center overflow-visible bg-[#A2B193]"
       >
-        {/* Full Image 1 Background: Preserving original artwork, muted green tone, corner foliage, and circular design */}
         <div className="absolute inset-0 w-full h-full pointer-events-none z-0 overflow-hidden">
           <Image
             src="/images/about-bg.jpg"
-            alt="Verdant botanical sanctuary"
+            alt="StockSure botanical sanctuary"
             fill
             priority
             sizes="100vw"
             className="object-cover object-center filter brightness-[1.01]"
           />
-          {/* Subtle soft ambient daylight glow */}
           <div className="absolute inset-0 bg-gradient-to-tr from-black/10 via-transparent to-white/10 pointer-events-none" />
         </div>
 
-        {/* Succulent Pot Container: Resting gracefully in About Us circular artwork */}
+        {/* Succulent Pot Animation */}
         <div
           id="succulent-pot-anchor"
           className="absolute left-[70.1%] top-[52.8%] -translate-x-1/2 -translate-y-1/2 z-40 pointer-events-none flex items-center justify-center"
@@ -358,7 +359,7 @@ export default function Home() {
             >
               <Image
                 src="/images/pot.png"
-                alt="Verdant botanical succulent arrangement in artisan stone bowl"
+                alt="StockSure botanical succulent arrangement in artisan stone bowl"
                 fill
                 priority
                 sizes="(max-width: 640px) 260px, (max-width: 1024px) 380px, 460px"
@@ -368,10 +369,9 @@ export default function Home() {
           </motion.div>
         </div>
 
-        {/* Content Container: Left Column for Editorial Story, Right Column aligned with Pot */}
+        {/* Left Column Editorial */}
         <div className="relative z-20 max-w-7xl mx-auto px-6 sm:px-10 lg:px-14 w-full">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-8 items-center">
-            {/* Left Column: Refined Editorial Botanical Story */}
             <div className="lg:col-span-6 space-y-6 text-left max-w-xl">
               <div className="inline-flex items-center gap-2.5 px-3.5 py-1.5 rounded-full bg-[#183D2B]/12 border border-[#183D2B]/20 backdrop-blur-md">
                 <Leaf className="w-3.5 h-3.5 text-[#183D2B]" />
@@ -386,7 +386,7 @@ export default function Home() {
               </h2>
 
               <p className="font-sans text-sm sm:text-base text-[#183D2B]/90 font-light leading-relaxed">
-                At Verdant, every architectural specimen is acclimated in our artisan micro-greenhouses. We marry slow horticulture with peat-free custom substrates and hand-thrown ceramic stoneware to bring natural balance into residential spaces.
+                At StockSure, every botanical specimen is acclimated in our artisan micro-greenhouses across Bengaluru. We marry slow horticulture with peat-free custom substrates and hand-thrown ceramic stoneware to bring natural balance into residential spaces.
               </p>
 
               <div className="grid grid-cols-2 gap-4 pt-4 border-t border-[#183D2B]/20">
@@ -409,38 +409,34 @@ export default function Home() {
               </div>
             </div>
 
-            {/* Right Column: Balanced spacer matching composition */}
             <div className="hidden lg:block lg:col-span-6 min-h-[460px] pointer-events-none" />
           </div>
         </div>
       </section>
 
-      {/* 3. BRANCHES SECTION — With Cinematic Video Card on Left & Pot-Activated Play Collision */}
+      {/* 3. BRANCHES SECTION */}
       <section
         id="branches"
         className="relative z-20 bg-[#b8c5ae] text-[#183D2B] py-28 sm:py-36 px-4 sm:px-8 lg:px-12 overflow-visible border-t border-[#183D2B]/10"
       >
         <div className="max-w-7xl mx-auto space-y-16 sm:space-y-20">
-          {/* Header */}
           <div className="text-center space-y-4 max-w-2xl mx-auto">
             <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[#183D2B]/10 border border-[#183D2B]/15 text-[11px] font-semibold text-[#183D2B] uppercase tracking-widest">
               <Compass className="w-3.5 h-3.5 text-[#183D2B]" />
               <span>Physical Sanctuaries</span>
             </div>
             <h2 className="font-playfair text-4xl sm:text-5xl md:text-6xl font-normal text-[#183D2B] tracking-tight leading-[1.08]">
-              Find Your Nearest Verdant
+              Find Your Nearest StockSure Branch
             </h2>
             <p className="font-sans text-sm sm:text-base text-[#3D5A45] font-light leading-relaxed">
-              A little greenery, closer to home.
+              Serving Bengaluru with instant delivery and fresh nursery pickup.
             </p>
           </div>
 
-          {/* MAIN SHOWCASE: Left Side Video Card & Right Side Branch Locations */}
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-10 items-stretch">
-            {/* LEFT SIDE: Premium Branches Video Card (Cols 1-5) */}
+            {/* Video Card */}
             <div className="lg:col-span-5 xl:col-span-5 flex flex-col justify-between gap-6">
               <div className="group relative w-full rounded-[24px] bg-[#cad6c0]/70 hover:bg-[#d0dcbf]/85 border border-[#183D2B]/15 hover:border-[#183D2B]/35 shadow-[0_8px_32px_rgba(24,61,43,0.08)] hover:shadow-[0_18px_44px_rgba(24,61,43,0.15)] transition-all duration-300 p-5 sm:p-7 flex flex-col justify-between gap-5 hover:-translate-y-1 h-full">
-                {/* Card Header */}
                 <div className="flex items-center justify-between">
                   <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/80 backdrop-blur-md border border-[#183D2B]/10 text-[11px] font-mono font-semibold uppercase tracking-wider text-[#183D2B]">
                     <Sparkles className="w-3.5 h-3.5 text-[#183D2B]" />
@@ -451,7 +447,6 @@ export default function Home() {
                   </span>
                 </div>
 
-                {/* 16:9 Video Container: Strict aspect-video maintains 1280x720 aspect ratio without stretch or unnecessary crop */}
                 <div
                   id="branches-video-container"
                   onClick={toggleVideoPlay}
@@ -470,14 +465,12 @@ export default function Home() {
                     <source src="/references/branches_video.mp4" type="video/mp4" />
                   </video>
 
-                  {/* Ambient Scrim Gradient */}
                   <div
                     className={`absolute inset-0 bg-gradient-to-t from-black/55 via-transparent to-black/25 pointer-events-none transition-opacity duration-300 ${
                       videoPlaying ? 'opacity-20 group-hover/player:opacity-50' : 'opacity-65'
                     }`}
                   />
 
-                  {/* Clean, Minimal Play Triangle Button at EXACT CENTER */}
                   <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                     <button
                       id="branches-play-button"
@@ -499,18 +492,13 @@ export default function Home() {
                           <span className="w-1.5 sm:w-2 h-5 sm:h-6 rounded-full bg-[#183D2B]" />
                         </div>
                       ) : (
-                        <svg
-                          className="w-7 h-7 sm:w-8 sm:h-8 text-[#183D2B] translate-x-0.5 transition-transform group-hover/player:scale-110"
-                          viewBox="0 0 24 24"
-                          fill="currentColor"
-                        >
+                        <svg className="w-7 h-7 sm:w-8 sm:h-8 text-[#183D2B] translate-x-0.5" viewBox="0 0 24 24" fill="currentColor">
                           <polygon points="6 3 20 12 6 21 6 3" />
                         </svg>
                       )}
                     </button>
                   </div>
 
-                  {/* Bottom Controls / Mute Button Bar inside Video */}
                   <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between pointer-events-none">
                     <span className="text-[10px] font-mono text-white/85 bg-black/50 backdrop-blur-md px-2.5 py-0.5 rounded-full">
                       {videoPlaying ? 'Click video to pause' : 'Click to play film'}
@@ -524,26 +512,20 @@ export default function Home() {
                       className="pointer-events-auto p-1.5 rounded-full bg-black/50 hover:bg-black/75 backdrop-blur-md text-white transition-colors cursor-pointer"
                       aria-label={isMuted ? 'Unmute video' : 'Mute video'}
                     >
-                      {isMuted ? (
-                        <VolumeX className="w-3.5 h-3.5" />
-                      ) : (
-                        <Volume2 className="w-3.5 h-3.5" />
-                      )}
+                      {isMuted ? <VolumeX className="w-3.5 h-3.5" /> : <Volume2 className="w-3.5 h-3.5" />}
                     </button>
                   </div>
                 </div>
 
-                {/* Editorial Caption & Details below the video */}
                 <div className="space-y-2">
                   <h4 className="font-playfair text-xl sm:text-2xl font-bold text-[#183D2B] leading-tight">
                     Living Conservatories Film
                   </h4>
                   <p className="text-xs sm:text-sm text-[#2D5038] font-light leading-relaxed">
-                    Take a visual walkthrough of our flagship San Francisco atrium and coastal specimen collections.
+                    Take a visual walkthrough of our flagship Koramangala atrium and nursery specimen collections.
                   </p>
                 </div>
 
-                {/* Botanical Badges */}
                 <div className="pt-3 border-t border-[#183D2B]/15 flex items-center justify-between text-[11px] font-mono text-[#3D5A45]">
                   <span>4K Greenhouse Film</span>
                   <span>Muted by Default</span>
@@ -552,14 +534,17 @@ export default function Home() {
               </div>
             </div>
 
-            {/* RIGHT SIDE: The 3 Branch Cards (Cols 6-12) */}
+            {/* Right Side: Bangalore Branch Cards */}
             <div className="lg:col-span-7 xl:col-span-7 space-y-6 flex flex-col justify-between">
-              {BRANCHES.map((b, idx) => (
+              {branchesList.map((b, idx) => (
                 <div
                   key={b.id}
-                  className="group relative p-6 sm:p-7 rounded-[20px] bg-[#cad6c0]/70 hover:bg-[#d0dcbf]/85 border border-[#183D2B]/15 hover:border-[#183D2B]/35 shadow-[0_4px_24px_rgba(24,61,43,0.06)] hover:shadow-[0_16px_36px_rgba(24,61,43,0.12)] transition-all duration-300 flex flex-col sm:flex-row gap-6 items-center justify-between hover:-translate-y-1"
+                  className={`group relative p-6 sm:p-7 rounded-[20px] transition-all duration-300 flex flex-col sm:flex-row gap-6 items-center justify-between hover:-translate-y-1 ${
+                    selectedBranch.id === b.id
+                      ? 'bg-[#d0dcbf] border-2 border-[#183D2B] shadow-md'
+                      : 'bg-[#cad6c0]/70 hover:bg-[#d0dcbf]/85 border border-[#183D2B]/15'
+                  }`}
                 >
-                  {/* Thumbnail Image with Zoom on Hover */}
                   <div className="relative w-full sm:w-44 h-40 sm:h-36 rounded-[14px] overflow-hidden bg-[#183D2B]/10 flex-shrink-0">
                     <Image
                       src={b.image}
@@ -569,11 +554,10 @@ export default function Home() {
                       className="object-cover object-center group-hover:scale-105 transition-transform duration-500 ease-out"
                     />
                     <div className="absolute top-2.5 left-2.5 px-2 py-0.5 rounded-full bg-[#183D2B]/85 backdrop-blur-md text-white text-[10px] font-mono">
-                      {b.city.split(',')[0]}
+                      {b.city}
                     </div>
                   </div>
 
-                  {/* Info */}
                   <div className="space-y-2.5 flex-1 min-w-0">
                     <div className="flex items-center justify-between">
                       <span className="text-[11px] font-mono text-[#3D5A45] font-semibold uppercase tracking-wider">
@@ -600,24 +584,26 @@ export default function Home() {
                     </div>
 
                     <div className="pt-2 flex items-center gap-3">
-                      <a
-                        href={`https://maps.google.com/?q=${encodeURIComponent(b.address)}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1.5 py-1.5 px-3 rounded-[8px] bg-[#183D2B] hover:bg-[#0E261A] text-white text-xs font-semibold tracking-wide transition-colors"
+                      <button
+                        onClick={() => handleBranchSelect(b)}
+                        className={`inline-flex items-center gap-1.5 py-1.5 px-3 rounded-[8px] text-xs font-semibold tracking-wide transition-colors ${
+                          selectedBranch.id === b.id
+                            ? 'bg-[#183D2B] text-white shadow-xs'
+                            : 'bg-white/80 text-[#183D2B] hover:bg-white border border-[#183D2B]/20'
+                        }`}
                       >
-                        <span>Directions</span>
-                        <ExternalLink className="w-3 h-3" />
-                      </a>
+                        <span>{selectedBranch.id === b.id ? 'Active Branch' : 'Select Branch'}</span>
+                      </button>
+
                       <button
                         onClick={() => {
-                          setSelectedBranch(b);
+                          handleBranchSelect(b);
                           setVisitedBranchModal(b);
                         }}
                         className="inline-flex items-center gap-1.5 py-1.5 px-3 rounded-[8px] bg-white/70 hover:bg-white text-[#183D2B] border border-[#183D2B]/20 text-xs font-semibold tracking-wide transition-all cursor-pointer"
                       >
                         <span>Details</span>
-                        <ArrowRight className="w-3 h-3" />
+                        <ArrowRight className="w-3.5 h-3.5" />
                       </button>
                     </div>
                   </div>
@@ -626,91 +612,79 @@ export default function Home() {
             </div>
           </div>
 
-          {/* Large Regional Map Area Showing Branch Locations */}
+          {/* Regional Map Card */}
           <div className="rounded-[24px] bg-[#cad6c0]/45 border border-[#183D2B]/15 p-6 sm:p-10 shadow-[0_8px_32px_rgba(24,61,43,0.06)] space-y-6">
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-[#183D2B]/15 pb-5">
               <div>
                 <span className="text-[11px] font-mono uppercase tracking-widest text-[#3D5A45] font-bold block">
-                  Regional Sanctuary Map
+                  Regional Bengaluru Sanctuary Map
                 </span>
                 <h3 className="font-playfair text-2xl font-bold text-[#183D2B] mt-1">
                   Active Conservatory: {selectedBranch.name}
                 </h3>
               </div>
 
-              {/* Branch Selector Pills */}
               <div className="flex flex-wrap items-center gap-2">
-                {BRANCHES.map((b) => (
+                {branchesList.map((b) => (
                   <button
                     key={b.id}
-                    onClick={() => setSelectedBranch(b)}
+                    onClick={() => handleBranchSelect(b)}
                     className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all cursor-pointer ${
                       selectedBranch.id === b.id
                         ? 'bg-[#183D2B] text-white shadow-xs'
                         : 'bg-white/50 text-[#183D2B] hover:bg-white/80 border border-[#183D2B]/15'
                     }`}
                   >
-                    {b.city.split(',')[0]}
+                    {b.name.replace('StockSure ', '')}
                   </button>
                 ))}
               </div>
             </div>
 
-            {/* Stylized Botanical Map Surface */}
+            {/* Interactive Map Embed */}
             <div className="relative w-full h-80 sm:h-96 rounded-[18px] overflow-hidden bg-[#9fb292]/40 border border-[#183D2B]/15 flex items-center justify-center">
-              {/* Subtle map topography grid */}
-              <div className="absolute inset-0 opacity-15 bg-[radial-gradient(#183D2B_1px,transparent_1px)] [background-size:16px_16px]" />
+              {process.env.NEXT_PUBLIC_GOOGLE_MAPS_KEY ? (
+                <iframe
+                  width="100%"
+                  height="100%"
+                  style={{ border: 0 }}
+                  loading="lazy"
+                  allowFullScreen
+                  src={`https://www.google.com/maps/embed/v1/place?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_KEY}&q=${selectedBranch.lat},${selectedBranch.lng}`}
+                />
+              ) : (
+                <iframe
+                  width="100%"
+                  height="100%"
+                  style={{ border: 0 }}
+                  loading="lazy"
+                  src={`https://www.openstreetmap.org/export/embed.html?bbox=${selectedBranch.lng - 0.015}%2C${selectedBranch.lat - 0.01}%2C${selectedBranch.lng + 0.015}%2C${selectedBranch.lat + 0.01}&layer=mapnik&marker=${selectedBranch.lat}%2C${selectedBranch.lng}`}
+                />
+              )}
 
-              {/* Map Display & Interactive Pins */}
-              <div className="relative z-10 w-full h-full p-6 sm:p-12 flex flex-col justify-between">
-                <div className="flex items-center justify-between text-xs font-mono text-[#183D2B]/70">
-                  <span>LAT: {selectedBranch.lat}° N</span>
-                  <span>LNG: {Math.abs(selectedBranch.lng)}° W</span>
-                </div>
-
-                {/* Central Location Pin Callout */}
-                <div className="max-w-md mx-auto text-center space-y-3 bg-white/90 backdrop-blur-md p-6 rounded-[18px] border border-[#183D2B]/20 shadow-[0_12px_28px_rgba(24,61,43,0.12)]">
-                  <div className="w-10 h-10 rounded-full bg-[#183D2B] text-white flex items-center justify-center mx-auto shadow-md">
-                    <MapPin className="w-5 h-5 text-[#b8c5ae]" />
-                  </div>
-                  <div>
-                    <h4 className="font-playfair text-lg font-bold text-[#183D2B]">
-                      {selectedBranch.name}
-                    </h4>
-                    <p className="text-xs text-[#2D5038] mt-1 leading-snug">
-                      {selectedBranch.address}
-                    </p>
-                  </div>
-                  <div className="pt-2">
-                    <a
-                      href={`https://maps.google.com/?q=${encodeURIComponent(selectedBranch.address)}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-[#183D2B] hover:bg-[#0E261A] text-white text-xs font-semibold tracking-wide transition-colors"
-                    >
-                      <Navigation className="w-3.5 h-3.5" />
-                      <span>Navigate via Google Maps</span>
-                    </a>
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between text-[11px] text-[#3D5A45]">
-                  <span>Conservatory Operating Hours: {selectedBranch.hours.split('|')[0]}</span>
-                  <span className="hidden sm:inline">Ready for live Google Maps API integration</span>
-                </div>
+              {/* Map Footer Link */}
+              <div className="absolute bottom-3 right-3 z-20 flex gap-2">
+                <a
+                  href={`https://www.openstreetmap.org/?mlat=${selectedBranch.lat}&mlon=${selectedBranch.lng}#map=16/${selectedBranch.lat}/${selectedBranch.lng}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-3 py-1.5 rounded-full bg-white/90 text-[#183D2B] text-xs font-semibold shadow-sm hover:bg-white flex items-center gap-1 backdrop-blur-md"
+                >
+                  <span>OpenStreetMap View</span>
+                  <ExternalLink className="w-3 h-3" />
+                </a>
               </div>
             </div>
           </div>
         </div>
       </section>
 
-      {/* 4. CONTACT US SECTION — Completely Redesigned Premium Botanical Layout (#b8c5ae) */}
+      {/* 4. CONTACT US SECTION */}
       <section
         id="contact"
         className="relative z-30 bg-[#b8c5ae] text-[#183D2B] py-28 sm:py-36 px-4 sm:px-8 lg:px-12 border-t border-[#183D2B]/10 overflow-hidden"
       >
         <div className="max-w-7xl mx-auto space-y-16">
-          {/* Header */}
           <div className="text-center space-y-4 max-w-2xl mx-auto">
             <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[#183D2B]/10 border border-[#183D2B]/15 text-[11px] font-semibold text-[#183D2B] uppercase tracking-widest">
               <Mail className="w-3.5 h-3.5 text-[#183D2B]" />
@@ -720,18 +694,17 @@ export default function Home() {
               Let&apos;s Grow Something Together.
             </h2>
             <p className="font-sans text-sm sm:text-base text-[#3D5A45] font-light leading-relaxed">
-              Have a question, need help choosing a plant, or want to bring a little more green into your life? We&apos;d love to hear from you.
+              Have a question, need help choosing a plant, or want advice from our resident botanists? We&apos;d love to hear from you.
             </p>
           </div>
 
-          {/* Two-Column Contact Layout */}
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 sm:gap-10 items-stretch">
             {/* Left Side: Contact Information */}
             <div className="lg:col-span-5 p-8 sm:p-10 rounded-[20px] bg-[#cad6c0]/70 border border-[#183D2B]/15 shadow-[0_4px_24px_rgba(24,61,43,0.06)] flex flex-col justify-between space-y-8">
               <div className="space-y-6">
                 <div>
                   <span className="text-[11px] font-mono uppercase tracking-widest text-[#3D5A45] font-bold block">
-                    Sanctuary HQ & Advisory
+                    StockSure HQ & Advisory
                   </span>
                   <h3 className="font-playfair text-2xl sm:text-3xl font-bold text-[#183D2B] mt-1">
                     Conservatory Concierge
@@ -741,9 +714,7 @@ export default function Home() {
                   </p>
                 </div>
 
-                {/* Structured Contact Details */}
                 <div className="space-y-4 text-xs text-[#2D5038] pt-4 border-t border-[#183D2B]/15">
-                  {/* Visit Us */}
                   <div className="flex items-start gap-3.5 group">
                     <div className="w-9 h-9 rounded-[10px] bg-[#183D2B]/10 text-[#183D2B] flex items-center justify-center flex-shrink-0 group-hover:bg-[#183D2B] group-hover:text-white transition-colors">
                       <MapPin className="w-4 h-4" />
@@ -751,38 +722,35 @@ export default function Home() {
                     <div>
                       <span className="font-bold text-[#183D2B] block">Visit Us</span>
                       <span className="text-[#24422E] leading-snug">
-                        428 Botanical Way, Conservatory Park<br />San Francisco, CA 94117
+                        {CONTACT_ADDRESS}
                       </span>
                     </div>
                   </div>
 
-                  {/* Call Us */}
                   <div className="flex items-start gap-3.5 group">
                     <div className="w-9 h-9 rounded-[10px] bg-[#183D2B]/10 text-[#183D2B] flex items-center justify-center flex-shrink-0 group-hover:bg-[#183D2B] group-hover:text-white transition-colors">
                       <Phone className="w-4 h-4" />
                     </div>
                     <div>
                       <span className="font-bold text-[#183D2B] block">Call Us</span>
-                      <a href="tel:+14158904420" className="text-[#24422E] hover:underline">
-                        +1 (415) 890-4420
+                      <a href={`tel:${CONTACT_PHONE.replace(/\s+/g, '')}`} className="text-[#24422E] hover:underline">
+                        {CONTACT_PHONE}
                       </a>
                     </div>
                   </div>
 
-                  {/* Email Us */}
                   <div className="flex items-start gap-3.5 group">
                     <div className="w-9 h-9 rounded-[10px] bg-[#183D2B]/10 text-[#183D2B] flex items-center justify-center flex-shrink-0 group-hover:bg-[#183D2B] group-hover:text-white transition-colors">
                       <Mail className="w-4 h-4" />
                     </div>
                     <div>
                       <span className="font-bold text-[#183D2B] block">Email Us</span>
-                      <a href="mailto:conservatory@verdant-botanicals.com" className="text-[#24422E] hover:underline">
-                        conservatory@verdant-botanicals.com
+                      <a href={`mailto:${CONTACT_EMAIL}`} className="text-[#24422E] hover:underline">
+                        {CONTACT_EMAIL}
                       </a>
                     </div>
                   </div>
 
-                  {/* Opening Hours */}
                   <div className="flex items-start gap-3.5 group">
                     <div className="w-9 h-9 rounded-[10px] bg-[#183D2B]/10 text-[#183D2B] flex items-center justify-center flex-shrink-0 group-hover:bg-[#183D2B] group-hover:text-white transition-colors">
                       <Clock className="w-4 h-4" />
@@ -790,14 +758,13 @@ export default function Home() {
                     <div>
                       <span className="font-bold text-[#183D2B] block">Opening Hours</span>
                       <span className="text-[#24422E] leading-snug">
-                        Mon – Sat: 9:00 AM – 7:00 PM<br />Sun: 10:00 AM – 6:00 PM PST
+                        {CONTACT_HOURS}
                       </span>
                     </div>
                   </div>
                 </div>
               </div>
 
-              {/* Botanical Trust Badge */}
               <div className="p-4 rounded-[14px] bg-[#183D2B]/8 border border-[#183D2B]/10 text-xs text-[#24422E] flex items-center gap-3">
                 <Sparkles className="w-4 h-4 text-[#183D2B] flex-shrink-0" />
                 <span className="leading-snug">
@@ -806,7 +773,7 @@ export default function Home() {
               </div>
             </div>
 
-            {/* Right Side: Premium Functional Contact Form */}
+            {/* Right Side: Contact Form */}
             <div className="lg:col-span-7 p-8 sm:p-10 rounded-[20px] bg-[#c3cfb9]/60 border border-[#183D2B]/15 shadow-[0_8px_32px_rgba(24,61,43,0.06)] flex flex-col justify-between">
               {formStatus === 'success' ? (
                 <div className="py-12 text-center space-y-4 animate-fade-in">
@@ -817,7 +784,7 @@ export default function Home() {
                     Inquiry Dispatched
                   </h3>
                   <p className="text-sm text-[#2D5038] max-w-sm mx-auto leading-relaxed">
-                    Thank you! Your message has been received by our resident horticulturalists at the San Francisco Flagship. We will reply to your email shortly.
+                    Thank you! Your message has been received by our resident horticulturalists at StockSure Bengaluru. We will reply to your email shortly.
                   </p>
                   <button
                     onClick={() => setFormStatus('idle')}
@@ -837,7 +804,6 @@ export default function Home() {
                     </h3>
                   </div>
 
-                  {/* Error Notification */}
                   {formStatus === 'error' && (
                     <div className="p-3.5 rounded-[12px] bg-red-100/80 border border-red-300 text-red-800 text-xs flex items-center gap-2">
                       <AlertCircle className="w-4 h-4 flex-shrink-0" />
@@ -845,7 +811,6 @@ export default function Home() {
                     </div>
                   )}
 
-                  {/* Input Grid */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-1.5">
                       <label className="text-xs font-semibold text-[#183D2B]">
@@ -856,7 +821,7 @@ export default function Home() {
                         required
                         value={formData.name}
                         onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                        placeholder="Evelyn Thorne"
+                        placeholder="Priya Sharma"
                         className="w-full px-4 py-2.5 rounded-[12px] bg-white/70 border border-[#183D2B]/15 focus:border-[#183D2B] focus:bg-white focus:outline-hidden text-xs text-[#183D2B] placeholder-[#183D2B]/40 transition-colors"
                       />
                     </div>
@@ -870,7 +835,7 @@ export default function Home() {
                         required
                         value={formData.email}
                         onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                        placeholder="evelyn@example.com"
+                        placeholder="priya@example.com"
                         className="w-full px-4 py-2.5 rounded-[12px] bg-white/70 border border-[#183D2B]/15 focus:border-[#183D2B] focus:bg-white focus:outline-hidden text-xs text-[#183D2B] placeholder-[#183D2B]/40 transition-colors"
                       />
                     </div>
@@ -885,7 +850,7 @@ export default function Home() {
                         type="tel"
                         value={formData.phone}
                         onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                        placeholder="+1 (415) 000-0000"
+                        placeholder="+91 98765 43210"
                         className="w-full px-4 py-2.5 rounded-[12px] bg-white/70 border border-[#183D2B]/15 focus:border-[#183D2B] focus:bg-white focus:outline-hidden text-xs text-[#183D2B] placeholder-[#183D2B]/40 transition-colors"
                       />
                     </div>
@@ -950,19 +915,19 @@ export default function Home() {
       <footer className="relative z-30 bg-[#183D2B] text-white/80 py-16 px-4 sm:px-8 border-t border-[#183D2B]">
         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-6 text-xs">
           <div className="flex items-center gap-2 text-white">
-            <Sprout className="w-5 h-5 text-[#b8c5ae]" />
-            <span className="font-playfair text-lg font-bold tracking-widest leading-none">VERDANT</span>
+            <span className="font-playfair text-lg font-bold tracking-widest leading-none">StockSure</span>
           </div>
 
           <div className="flex items-center gap-6 text-white/70">
             <a href="#home" className="hover:text-white transition-colors">Home</a>
+            <a href="/shop" className="hover:text-white transition-colors">Shop</a>
             <a href="#about" className="hover:text-white transition-colors">About Us</a>
             <a href="#branches" className="hover:text-white transition-colors">Branches</a>
             <a href="#contact" className="hover:text-white transition-colors">Contact Us</a>
           </div>
 
           <p className="text-white/50 text-[11px]">
-            &copy; {new Date().getFullYear()} VERDANT Botanicals Sanctuary. All rights reserved.
+            &copy; 2026 StockSure Botanical Nursery Ltd. All rights reserved.
           </p>
         </div>
       </footer>
@@ -1029,12 +994,12 @@ export default function Home() {
 
               <div className="pt-2 flex items-center gap-3">
                 <a
-                  href={`https://maps.google.com/?q=${encodeURIComponent(visitedBranchModal.address)}`}
+                  href={`https://www.openstreetmap.org/?mlat=${visitedBranchModal.lat}&mlon=${visitedBranchModal.lng}#map=16/${visitedBranchModal.lat}/${visitedBranchModal.lng}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex-1 py-3 rounded-[12px] bg-[#183D2B] hover:bg-[#0E261A] text-white text-xs font-semibold text-center transition-colors shadow-sm"
                 >
-                  Directions to Branch
+                  View on OpenStreetMap
                 </a>
                 <button
                   onClick={() => setVisitedBranchModal(null)}
