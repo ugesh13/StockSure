@@ -65,6 +65,21 @@ const Schema = z.object({
   ZOHO_ORG_ID: str(),
   ZOHO_ACCOUNTS_URL: z.string().default('https://accounts.zoho.in'),
   ZOHO_API_URL: z.string().default('https://www.zohoapis.in/inventory/v1'),
+
+  PAYMENT_PROVIDER: z.enum(['mock', 'razorpay']).default('mock'),
+  RAZORPAY_KEY_ID: str(),
+  RAZORPAY_KEY_SECRET: str(),
+  RAZORPAY_WEBHOOK_SECRET: str(),
+  PAYMENT_TTL_MINUTES: int(15, 1, 120),
+
+  GOOGLE_MAPS_SERVER_KEY: str(),
+
+  DELIVERY_MAX_KM: int(15, 1, 100),
+  DELIVERY_BASE_FEE: int(40, 0, 1000),
+  DELIVERY_PER_KM: int(8, 0, 100),
+  FREE_DELIVERY_ABOVE: int(999, 0, 10000),
+
+  CHAT_LLM_PROVIDER: z.enum(['none']).default('none'),
 });
 
 export type Config = z.infer<typeof Schema>;

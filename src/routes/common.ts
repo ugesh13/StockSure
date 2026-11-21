@@ -33,7 +33,13 @@ export async function requireDemoOrStaff(req: FastifyRequest): Promise<void> {
 }
 
 export async function customerOf(req: FastifyRequest): Promise<number> {
-  const token = header(req, 'x-session-token');
+  let token = header(req, 'x-session-token');
+  if (!token) {
+    const authHeader = header(req, 'authorization');
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      token = authHeader.slice(7).trim();
+    }
+  }
   const raw = header(req, 'x-customer-id');
 
   if (token) {

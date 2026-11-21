@@ -21,6 +21,7 @@ import { withTimeout } from '../util.ts';
 import { syncInventoryWithZoho } from '../integrations/zoho.ts';
 import { IdSchema, UuidSchema, customerOf, idempotencyKeyOf, requireAdmin, requireDemoOrStaff, requireStaff, respondCheckout, shopperCityOf } from './common.ts';
 import { createSession, deleteCustomerAccount } from '../services/session.ts';
+import { authRoutes } from './auth.ts';
 import {
   addProductRequest,
   getProductRequests,
@@ -81,6 +82,9 @@ async function check(fn: () => Promise<Record<string, unknown>>): Promise<Record
 }
 
 export function registerRoutes(app: FastifyInstance): void {
+  // ---------- auth ----------
+  app.register(authRoutes);
+
   // ---------- health ----------
   app.get('/health', async (_req, reply) => {
     const h = getHealth();
