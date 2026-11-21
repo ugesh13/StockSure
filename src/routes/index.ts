@@ -9,7 +9,7 @@ import { reindexAll } from '../search/reindex.ts';
 import { ALERT_INSERT_SQL, STOCK_EXISTS_SQL } from '../sql.ts';
 import { addToCart, clearCart, getCart, removeItem, setQty } from '../services/cart.ts';
 import { getProduct, listBranches, listCategories, listProducts } from '../services/catalog.ts';
-import { cancelOrder, checkout, getOrder, listOrders, payOrder } from '../services/orders.ts';
+import { cancelOrder, checkout, getOrder, payOrder } from '../services/orders.ts';
 import { heartbeat, posSale, restock, staffCount } from '../services/pos.ts';
 import { proofFor, recentEvents } from '../services/proof.ts';
 import { applyRescueToCart, rescueForOrder } from '../services/rescue.ts';
@@ -20,7 +20,13 @@ import { AppError, notFound } from '../errors.ts';
 import { withTimeout } from '../util.ts';
 import { syncInventoryWithZoho } from '../integrations/zoho.ts';
 import { IdSchema, UuidSchema, customerOf, idempotencyKeyOf, requireAdmin, requireDemoOrStaff, requireStaff, respondCheckout, shopperCityOf } from './common.ts';
-import { createSession, deleteCustomerAccount } from '../services/session.ts';
+import { createSession } from '../services/session.ts';
+import {
+  registerCustomer,
+  loginCustomer,
+  getCustomerProfile,
+  logoutSession,
+} from '../services/auth.ts';
 import {
   addProductRequest,
   getProductRequests,
@@ -93,43 +99,49 @@ export function registerRoutes(app: FastifyInstance): void {
     });
   });
 
-  // ---------- session & customer ----------
+  // ---------- session & authentication ----------
   app.post('/session', LIMIT(20), async (req) => {
     const b = z.object({ name: z.string().max(80).optional() }).parse(req.body ?? {});
     return createSession(b.name);
   });
 
-  app.delete(
-    '/me',
-    {
-      ...LIMIT(10),
-      schema: {
-        tags: ['Storefront'],
-        summary: 'Delete customer account',
-        description: 'Delete customer account, active cart, alerts, and sessions, and anonymize user record',
-        response: {
-          200: {
-            type: 'object',
-            properties: {
-              ok: { type: 'boolean' },
-              message: { type: 'string' },
-            },
-          },
-        },
-      },
-    },
-    async (req) => {
-      const token = req.headers['x-session-token'];
-      if (!token || typeof token !== 'string' || !token.trim()) {
-        throw new AppError(401, 'SESSION_REQUIRED', 'Session token is required to delete account.');
-      }
-      const customerId = await customerOf(req);
-      return deleteCustomerAccount(customerId);
-    },
-  );
+  app.post('/auth/register', LIMIT(20), async (req) => {
+    const b = z
+      .object({
+        email: z.string().email(),
+        password: z.string().min(6).max(100),
+        name: z.string().min(1).max(80),
+        phone: z.string().max(20).optional(),
+      })
+      .parse(req.body ?? {});
+    return registerCustomer(b);
+  });
+
+  app.post('/auth/login', LIMIT(30), async (req) => {
+    const b = z
+      .object({
+        email: z.string().email(),
+        password: z.string().min(1).max(100),
+      })
+      .parse(req.body ?? {});
+    return loginCustomer(b);
+  });
+
+  app.get('/auth/me', LIMIT(120), async (req) => {
+    const customerId = await customerOf(req);
+    return getCustomerProfile(customerId);
+  });
+
+  app.post('/auth/logout', LIMIT(60), async (req) => {
+    const token = req.headers['x-session-token'];
+    if (typeof token === 'string' && token.trim()) {
+      return logoutSession(token);
+    }
+    return { ok: true, message: 'No active session' };
+  });
 
   // ---------- browse ----------
-  app.get('/products', LIMIT(240), async (req) => {
+  app.get('/products', async (req) => {
     const q = z
       .object({
         category: z.string().max(40).optional(),
@@ -140,17 +152,17 @@ export function registerRoutes(app: FastifyInstance): void {
       .parse(req.query);
     return listProducts(q);
   });
-  app.get('/products/:id', LIMIT(240), async (req) => getProduct(IdSchema.parse((req.params as { id: string }).id)));
-  app.get('/categories', LIMIT(240), async () => ({ categories: await listCategories() }));
-  app.get('/branches', LIMIT(240), async () => ({ branches: await listBranches() }));
+  app.get('/products/:id', async (req) => getProduct(IdSchema.parse((req.params as { id: string }).id)));
+  app.get('/categories', async () => ({ categories: await listCategories() }));
+  app.get('/branches', async () => ({ branches: await listBranches() }));
 
   // ---------- branches layout & shelves ----------
-  app.get('/branches/:id/layout', LIMIT(240), async (req) => {
+  app.get('/branches/:id/layout', async (req) => {
     const id = IdSchema.parse((req.params as { id: string }).id);
     return getBranchLayout(id);
   });
 
-  app.get('/branches/:id/shelves', LIMIT(240), async (req) => {
+  app.get('/branches/:id/shelves', async (req) => {
     const id = IdSchema.parse((req.params as { id: string }).id);
     const q = z.object({ since: z.string().optional() }).parse(req.query);
     return getBranchShelves(id, q.since);
@@ -165,41 +177,41 @@ export function registerRoutes(app: FastifyInstance): void {
     const r = await addProductRequest(b.query);
     return reply.status(201).send(r);
   });
-  app.get('/requests', { ...LIMIT(30), preHandler: requireStaff }, async () => getProductRequests());
+  app.get('/requests', { preHandler: requireStaff }, async () => getProductRequests());
 
   // ---------- cart (stored in Postgres; adding never holds stock) ----------
-  app.get('/cart', LIMIT(120), async (req) => getCart(await customerOf(req)));
-  app.post('/cart/items', LIMIT(120), async (req, reply) => {
+  app.get('/cart', async (req) => getCart(await customerOf(req)));
+  app.post('/cart/items', async (req, reply) => {
     const b = AddBody.parse(req.body);
     const customerId = await customerOf(req);
     await addToCart(customerId, b.product_id, b.branch_id, b.qty);
     return reply.status(201).send(await getCart(customerId));
   });
-  app.patch('/cart/items/:productId/:branchId', LIMIT(120), async (req) => {
+  app.patch('/cart/items/:productId/:branchId', async (req) => {
     const p = ItemParams.parse(req.params);
     const customerId = await customerOf(req);
     await setQty(customerId, p.productId, p.branchId, QtyBody.parse(req.body).qty);
     return getCart(customerId);
   });
-  app.delete('/cart/items/:productId/:branchId', LIMIT(120), async (req) => {
+  app.delete('/cart/items/:productId/:branchId', async (req) => {
     const p = ItemParams.parse(req.params);
     const customerId = await customerOf(req);
     await removeItem(customerId, p.productId, p.branchId);
     return getCart(customerId);
   });
-  app.delete('/cart', LIMIT(120), async (req) => {
+  app.delete('/cart', async (req) => {
     const customerId = await customerOf(req);
     await clearCart(customerId);
     return getCart(customerId);
   });
 
   // ---------- cart code & kiosk ----------
-  app.post('/cart/code', LIMIT(20), async (req) => {
+  app.post('/cart/code', async (req) => {
     const customerId = await customerOf(req);
     return createCartCode(customerId);
   });
 
-  app.get('/kiosk/cart/:code', LIMIT(30), async (req) => {
+  app.get('/kiosk/cart/:code', async (req) => {
     const { code } = z.object({ code: z.string().min(1).max(32) }).parse(req.params);
     const q = z.object({ branch_id: IdSchema.optional() }).parse(req.query);
     return getKioskCart(code, q.branch_id);
@@ -212,56 +224,18 @@ export function registerRoutes(app: FastifyInstance): void {
     const result = await checkout(customerId, idempotencyKeyOf(req), body.fulfilment, body.branch_id);
     return respondCheckout(reply, result, shopperCityOf(req));
   });
-  app.post('/orders/:id/pay', LIMIT(30), async (req) => {
+  app.post('/orders/:id/pay', async (req) => {
     const { id } = OrderParams.parse(req.params);
     const customerId = await customerOf(req);
     const r = await payOrder(customerId, id);
     return { order: r.order, replay: r.replay };
   });
-  app.post('/orders/:id/cancel', LIMIT(30), async (req) => {
+  app.post('/orders/:id/cancel', async (req) => {
     const { id } = OrderParams.parse(req.params);
     const customerId = await customerOf(req);
     return { order: await cancelOrder(customerId, id) };
   });
-  app.get(
-    '/orders',
-    {
-      ...LIMIT(120),
-      schema: {
-        tags: ['Cart & Orders'],
-        summary: 'List caller orders',
-        description: "List caller's own orders newest first with limit and before cursor",
-        querystring: {
-          type: 'object',
-          properties: {
-            limit: { type: 'integer', default: 20, minimum: 1, maximum: 50 },
-            before: { type: 'string', description: 'ISO 8601 timestamp cursor' },
-          },
-        },
-        response: {
-          200: {
-            type: 'object',
-            properties: {
-              orders: { type: 'array' },
-              next_before: { type: ['string', 'null'] },
-            },
-          },
-        },
-      },
-    },
-    async (req) => {
-      const custId = await customerOf(req);
-      const q = z
-        .object({
-          limit: z.coerce.number().int().min(1).max(50).default(20),
-          before: z.string().optional(),
-        })
-        .parse(req.query);
-      return listOrders(custId, q, getPool());
-    },
-  );
-
-  app.get('/orders/:id', LIMIT(120), async (req) => {
+  app.get('/orders/:id', async (req) => {
     const { id } = OrderParams.parse(req.params);
     const customerId = await customerOf(req);
     return { order: await getOrder(customerId, id, getPool()) };
@@ -269,7 +243,7 @@ export function registerRoutes(app: FastifyInstance): void {
 
   // ---------- rescue ----------
   // Options for an order that was released because the store sold the unit first.
-  app.get('/orders/:id/rescue', LIMIT(120), async (req) => {
+  app.get('/orders/:id/rescue', async (req) => {
     const { id } = OrderParams.parse(req.params);
     const customerId = await customerOf(req);
     const order = await getOrder(customerId, id, getPool());
@@ -287,7 +261,7 @@ export function registerRoutes(app: FastifyInstance): void {
     return respondCheckout(reply, result, shopperCityOf(req));
   });
 
-  app.post('/alerts/back-in-stock', LIMIT(30), async (req, reply) => {
+  app.post('/alerts/back-in-stock', async (req, reply) => {
     const b = z.object({ product_id: IdSchema, branch_id: IdSchema }).parse(req.body);
     const customerId = await customerOf(req);
     const exists = await getPool().query(STOCK_EXISTS_SQL, [b.branch_id, b.product_id]);
@@ -297,26 +271,26 @@ export function registerRoutes(app: FastifyInstance): void {
   });
 
   // ---------- store side (POS and staff): X-Staff-Key ----------
-  app.post('/pos/sale', { ...LIMIT(30), preHandler: requireStaff }, async (req) => {
+  app.post('/pos/sale', { preHandler: requireStaff }, async (req) => {
     const b = SaleBody.parse(req.body);
     return posSale(b.branch_id, b.product_id, b.qty);
   });
-  app.post('/staff/count', { ...LIMIT(30), preHandler: requireStaff }, async (req) => {
+  app.post('/staff/count', { preHandler: requireStaff }, async (req) => {
     const b = CountBody.parse(req.body);
     return staffCount(b.branch_id, b.product_id, b.counted);
   });
-  app.post('/staff/restock', { ...LIMIT(30), preHandler: requireStaff }, async (req) => {
+  app.post('/staff/restock', { preHandler: requireStaff }, async (req) => {
     const b = RestockBody.parse(req.body);
     return restock(b.branch_id, b.product_id, b.qty);
   });
-  app.post('/pos/heartbeat', { ...LIMIT(600), preHandler: requireStaff }, async (req) => {
+  app.post('/pos/heartbeat', { preHandler: requireStaff }, async (req) => {
     const b = z.object({ branch_id: IdSchema }).parse(req.body);
     await heartbeat(b.branch_id);
     return { ok: true };
   });
 
   // ---------- staff add product ----------
-  app.post('/staff/products', { ...LIMIT(30), preHandler: requireStaff }, async (req, reply) => {
+  app.post('/staff/products', { preHandler: requireStaff }, async (req, reply) => {
     const b = z
       .object({
         name: z.string().min(1).max(200),
@@ -331,15 +305,15 @@ export function registerRoutes(app: FastifyInstance): void {
   });
 
   // ---------- proof panel & pipeline ----------
-  app.get('/demo/pipeline', { ...LIMIT(60), preHandler: requireDemoOrStaff }, async () => getPipelineMetrics());
-  app.get('/demo/proof/:id', { ...LIMIT(60), preHandler: requireDemoOrStaff }, async (req) => proofFor(OrderParams.parse(req.params).id));
-  app.get('/demo/events', { ...LIMIT(60), preHandler: requireDemoOrStaff }, async () => recentEvents());
+  app.get('/demo/pipeline', { preHandler: requireDemoOrStaff }, async () => getPipelineMetrics());
+  app.get('/demo/proof/:id', { preHandler: requireDemoOrStaff }, async (req) => proofFor(OrderParams.parse(req.params).id));
+  app.get('/demo/events', { preHandler: requireDemoOrStaff }, async () => recentEvents());
 
   // ---------- admin (self-healing): X-Admin-Token ----------
-  app.post('/admin/replay-dlq', { ...LIMIT(10), preHandler: requireAdmin }, async () => replayDlq());
-  app.post('/admin/reindex', { ...LIMIT(10), preHandler: requireAdmin }, async (req) => {
+  app.post('/admin/replay-dlq', { preHandler: requireAdmin }, async () => replayDlq());
+  app.post('/admin/reindex', { preHandler: requireAdmin }, async (req) => {
     const b = z.object({ recreate: z.boolean().default(false) }).parse(req.body ?? {});
     return reindexAll({ recreate: b.recreate });
   });
-  app.post('/admin/sync-zoho', { ...LIMIT(10), preHandler: requireAdmin }, async () => syncInventoryWithZoho());
+  app.post('/admin/sync-zoho', { preHandler: requireAdmin }, async () => syncInventoryWithZoho());
 }

@@ -166,11 +166,11 @@ const AboutUsSection = forwardRef(function AboutUsSection(
                 <div
                   ref={targetLandingRef}
                   id="cube-target-landing"
-                  className="w-24 h-24 rounded-2xl border border-[#183D2B]/20 bg-[#D8C5AA]/45 flex items-center justify-center relative shadow-[inset_0_2px_4px_rgba(0,0,0,0.06)]"
+                  className="w-28 sm:w-32 h-28 sm:h-32 rounded-2xl border border-[#183D2B]/20 bg-[#D8C5AA]/45 flex items-center justify-center relative shadow-[inset_0_2px_4px_rgba(0,0,0,0.06)]"
                   aria-hidden="true"
                 >
                   {/* Alignment marker */}
-                  <div className="w-2 h-2 rounded-full bg-[#183D2B]/25" />
+                  <div className="w-2.5 h-2.5 rounded-full bg-[#183D2B]/25" />
                 </div>
 
                 <div className="flex flex-col text-left pl-1">

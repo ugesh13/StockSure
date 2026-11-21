@@ -1,5 +1,5 @@
-import React from 'react';
-import { ShoppingCart, ArrowLeft, MapPin, Search, X } from 'lucide-react';
+import React, { useState } from 'react';
+import { ShoppingCart, ArrowLeft, MapPin, Search, X, User, LogOut } from 'lucide-react';
 import { useShop, CITIES } from '../../context/ShopContext';
 
 export default function ShopNavbar({
@@ -7,7 +7,18 @@ export default function ShopNavbar({
   setSearchQuery,
   onBackToHome,
 }) {
-  const { cart, setIsCartOpen, selectedCity, handleCityChange } = useShop();
+  const {
+    cart,
+    setIsCartOpen,
+    selectedCity,
+    handleCityChange,
+    isAuthenticated,
+    currentUser,
+    logout,
+    setIsLoginModalOpen,
+  } = useShop();
+
+  const [showUserDropdown, setShowUserDropdown] = useState(false);
 
   return (
     <header className="sticky top-0 z-40 bg-[#F5F1E8]/95 backdrop-blur-md border-b border-[#E2D7C6] transition-all">
@@ -18,7 +29,7 @@ export default function ShopNavbar({
           <button
             type="button"
             onClick={onBackToHome}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#E2D7C6]/50 hover:bg-[#E2D7C6] text-[#183D2B] text-xs font-medium transition-colors"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#E2D7C6]/50 hover:bg-[#E2D7C6] text-[#183D2B] text-xs font-medium transition-colors cursor-pointer"
             title="Return to cinematic homepage"
           >
             <ArrowLeft className="w-3.5 h-3.5" />
@@ -58,7 +69,7 @@ export default function ShopNavbar({
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search products, brands or anything you need..."
+              placeholder="Search 235+ fresh groceries, dairy, snacks..."
               className="w-full bg-[#FFFDF8] border border-[#E2D7C6] rounded-full pl-10 pr-9 py-2 text-xs sm:text-sm text-[#292722] placeholder-[#756B5E]/70 focus:outline-none focus:border-[#183D2B] focus:ring-1 focus:ring-[#183D2B] shadow-inner transition-all"
             />
             {searchQuery && (
@@ -74,8 +85,8 @@ export default function ShopNavbar({
           </div>
         </div>
 
-        {/* Right: Branch Selector & Cart */}
-        <div className="flex items-center gap-2.5 sm:gap-4 shrink-0">
+        {/* Right: Branch Selector, Auth & Cart */}
+        <div className="flex items-center gap-2 sm:gap-3.5 shrink-0">
           
           {/* City Branch Selector */}
           <div className="hidden lg:flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#FFFDF8] border border-[#E2D7C6] text-xs text-[#292722]">
@@ -92,6 +103,51 @@ export default function ShopNavbar({
               ))}
             </select>
           </div>
+
+          {/* User Account / Profile Menu */}
+          {isAuthenticated ? (
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setShowUserDropdown(!showUserDropdown)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#FFFDF8] border border-[#E2D7C6] text-xs text-[#183D2B] font-medium hover:bg-[#E2D7C6]/30 transition-all cursor-pointer"
+              >
+                <User className="w-3.5 h-3.5 text-[#245C3A]" />
+                <span className="hidden sm:inline max-w-[80px] truncate">
+                  {currentUser?.name?.split(' ')[0] || 'User'}
+                </span>
+              </button>
+
+              {showUserDropdown && (
+                <div className="absolute right-0 top-11 w-48 rounded-2xl bg-[#FFFDF8] border border-[#E2D7C6] shadow-xl p-2 z-50 text-xs animate-fade-in-up">
+                  <div className="px-3 py-2 border-b border-[#E2D7C6]/60">
+                    <p className="font-semibold text-[#183D2B] truncate">{currentUser?.name}</p>
+                    <p className="text-[11px] text-[#756B5E] truncate">{currentUser?.email}</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowUserDropdown(false);
+                      logout();
+                    }}
+                    className="w-full mt-1 flex items-center gap-2 px-3 py-2 text-rose-700 hover:bg-rose-50 rounded-xl transition-colors cursor-pointer text-left"
+                  >
+                    <LogOut className="w-3.5 h-3.5" />
+                    <span>Sign Out</span>
+                  </button>
+                </div>
+              )}
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setIsLoginModalOpen(true)}
+              className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#FFFDF8] border border-[#E2D7C6] text-xs text-[#183D2B] font-medium hover:bg-[#E2D7C6]/30 transition-all cursor-pointer"
+            >
+              <User className="w-3.5 h-3.5 text-[#245C3A]" />
+              <span>Sign In</span>
+            </button>
+          )}
 
           {/* Cart Icon & Live Badge */}
           <button

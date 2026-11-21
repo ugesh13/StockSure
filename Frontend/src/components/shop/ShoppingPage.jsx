@@ -24,6 +24,7 @@ import ProductCard from './ProductCard';
 import CartDrawer from './CartDrawer';
 import CheckoutModal from './CheckoutModal';
 import OrderSuccessModal from './OrderSuccessModal';
+import ProductDetailModal from './ProductDetailModal';
 
 const CATEGORY_DISPLAY_MAP = {
   grocery: { label: 'Grocery & Staples', emoji: '🌾' },
@@ -52,6 +53,8 @@ export default function ShoppingPage({ onBackToHome }) {
     selectedBranchId,
     toastMessage,
     setIsCartOpen,
+    selectedProductQuickView,
+    setSelectedProductQuickView,
   } = useShop();
 
   const [categories, setCategories] = useState([]);
@@ -556,6 +559,10 @@ export default function ShoppingPage({ onBackToHome }) {
       <CartDrawer />
       <CheckoutModal />
       <OrderSuccessModal />
+      <ProductDetailModal
+        product={selectedProductQuickView}
+        onClose={() => setSelectedProductQuickView(null)}
+      />
 
       {/* FLOATING ACTION TOAST */}
       {toastMessage && (

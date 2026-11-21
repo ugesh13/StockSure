@@ -16,15 +16,16 @@ import React, { forwardRef, useImperativeHandle, useRef } from 'react';
  * 
  * As user scrolls into About Us (aboutProgress > 0):
  * - Detaches from headline and falls downward under gravity
- * - Morphs from rounded dot into sharp-edged 3D cube (border-radius: 50% -> 0%)
- * - Expands in scale (~14px -> ~84px)
+ * - Morphs from rounded dot into enhanced 3D cube (~112px desktop, ~85px mobile)
+ * - Has subtle rounded corners (~10px) on cube faces
+ * - Shaded faces with rich emerald green (#174D32) and golden highlights
  * - Grows 3D depth along Z axis with 6 textured faces
  * - Spans 3D rotation (rotateX, rotateY, rotateZ) catching realistic lighting
  * - Face colors:
- *     Front:  #174D32 (Dark emerald green)
+ *     Front:  #174D32 (Dark emerald green) with gold edge sheen
  *     Sides:  #103B26 (Deep green) / #123E29
- *     Top:    #246640 (Slightly lighter green)
- *     Bottom: #0B281A (Green-black shadow face)
+ *     Top:    #246640 (Slightly lighter green) with golden ambient highlights
+ *     Bottom: #0B281A (Green-black shadow base)
  * - Lands on parchment surface with realistic impact, settling bounce & contact shadow
  * - Reversible when scrolling backward
  */
@@ -49,6 +50,11 @@ const FullStop3DCube = forwardRef(function FullStop3DCube({ prefersReducedMotion
       const cubeScene = cubeSceneRef.current;
       const shadow = shadowRef.current;
       if (!container || !cubeScene) return;
+
+      const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
+      const targetSize = isMobile ? 85 : 112;
+      const startSize = isMobile ? 10 : 14;
+      const targetRadius = isMobile ? 8 : 10;
 
       // When at rest in hero heading (progress == 0)
       if (progress <= 0) {
@@ -93,14 +99,14 @@ const FullStop3DCube = forwardRef(function FullStop3DCube({ prefersReducedMotion
       if (prefersReducedMotion) {
         const t = Math.min(Math.max(progress, 0), 1);
         container.style.transform = `translate3d(${deltaX * t}px, ${deltaY * t}px, 0px)`;
-        container.style.width = '84px';
-        container.style.height = '84px';
-        cubeScene.style.width = '84px';
-        cubeScene.style.height = '84px';
+        container.style.width = `${targetSize}px`;
+        container.style.height = `${targetSize}px`;
+        cubeScene.style.width = `${targetSize}px`;
+        cubeScene.style.height = `${targetSize}px`;
         cubeScene.style.transform = 'rotateX(-22deg) rotateY(35deg) rotateZ(-4deg)';
         if (frontFaceRef.current) {
-          frontFaceRef.current.style.transform = 'translateZ(42px)';
-          frontFaceRef.current.style.borderRadius = '0px';
+          frontFaceRef.current.style.transform = `translateZ(${targetSize / 2}px)`;
+          frontFaceRef.current.style.borderRadius = `${targetRadius}px`;
           frontFaceRef.current.style.backgroundColor = '#174D32';
         }
         return;
@@ -121,19 +127,17 @@ const FullStop3DCube = forwardRef(function FullStop3DCube({ prefersReducedMotion
         ? 2 * tFall * tFall 
         : 1 - Math.pow(-2 * tFall + 2, 2) / 2;
 
-      // Settling bounce after impact (progress: 0.76 -> 0.90)
+      // Settling bounce after impact (progress: 0.76 -> 0.92)
       let bounceOffset = 0;
       let bounceRot = 0;
       if (progress > 0.76 && progress <= 0.92) {
         const tb = (progress - 0.76) / 0.16; // 0.0 -> 1.0
         // Damped sine wave bounce
-        bounceOffset = Math.sin(tb * Math.PI) * 14 * Math.exp(-tb * 2.8);
+        bounceOffset = Math.sin(tb * Math.PI) * 16 * Math.exp(-tb * 2.8);
         bounceRot = Math.sin(tb * Math.PI * 1.5) * 3 * (1 - tb);
       }
 
-      // Cube size progression: 14px (period) -> 84px (solid cube)
-      const targetSize = 84;
-      const startSize = 14;
+      // Cube size progression: startSize (period) -> targetSize (enhanced 112px / 85px)
       const currSize = startSize + tFall * (targetSize - startSize);
       
       // Center compensation: as container expands, shift back by half the expansion delta
@@ -151,10 +155,9 @@ const FullStop3DCube = forwardRef(function FullStop3DCube({ prefersReducedMotion
       cubeScene.style.width = `${currSize.toFixed(1)}px`;
       cubeScene.style.height = `${currSize.toFixed(1)}px`;
 
-      // Border radius: 50% (dot) -> 0% (sharp cube edges)
-      // Sharpens early during the fall (by tFall = 0.32)
-      const radiusProgress = Math.min(tFall / 0.32, 1);
-      const borderRadius = `${(50 * (1 - radiusProgress)).toFixed(1)}%`;
+      // Border radius: 50% (dot) -> targetRadius (subtle rounded corners on cube faces)
+      const radiusProgress = Math.min(tFall / 0.35, 1);
+      const borderRadius = `${(50 * (1 - radiusProgress) + targetRadius * radiusProgress).toFixed(1)}px`;
 
       // 3D Half-depth (distance of each face from center)
       // Expands from 0 to currSize / 2
@@ -184,7 +187,7 @@ const FullStop3DCube = forwardRef(function FullStop3DCube({ prefersReducedMotion
         frontFaceRef.current.style.borderRadius = borderRadius;
         frontFaceRef.current.style.backgroundColor = frontColor;
         frontFaceRef.current.style.boxShadow = depthProgress > 0.5 
-          ? 'inset 0 1px 2px rgba(255,255,255,0.12), inset 0 -1px 2px rgba(0,0,0,0.3)' 
+          ? 'inset 0 1px 2px rgba(255,240,190,0.35), inset 0 -1px 3px rgba(0,0,0,0.35)' 
           : 'none';
       }
 
@@ -210,6 +213,9 @@ const FullStop3DCube = forwardRef(function FullStop3DCube({ prefersReducedMotion
         topFaceRef.current.style.transform = `rotateX(90deg) translateZ(${halfDepth.toFixed(1)}px)`;
         topFaceRef.current.style.borderRadius = borderRadius;
         topFaceRef.current.style.opacity = sideOpacity;
+        topFaceRef.current.style.boxShadow = depthProgress > 0.5
+          ? 'inset 0 1px 4px rgba(255, 235, 175, 0.65), inset 0 0 14px rgba(255, 230, 160, 0.25)'
+          : 'none';
       }
 
       if (bottomFaceRef.current) {
@@ -225,8 +231,8 @@ const FullStop3DCube = forwardRef(function FullStop3DCube({ prefersReducedMotion
         } else {
           // As cube lands, shadow darkens and sharpens
           const shadowT = Math.min(Math.max((progress - 0.45) / 0.35, 0), 1);
-          const shadowScale = 0.5 + shadowT * 0.5 - (bounceOffset / 14) * 0.25;
-          const shadowOpacity = (shadowT * 0.85 - (bounceOffset / 14) * 0.3).toFixed(3);
+          const shadowScale = 0.6 + shadowT * 0.45 - (bounceOffset / 16) * 0.25;
+          const shadowOpacity = (shadowT * 0.88 - (bounceOffset / 16) * 0.3).toFixed(3);
           shadow.style.opacity = shadowOpacity;
           shadow.style.transform = `rotateX(68deg) scale(${shadowScale.toFixed(2)})`;
         }
@@ -252,13 +258,13 @@ const FullStop3DCube = forwardRef(function FullStop3DCube({ prefersReducedMotion
         className="relative w-full h-full will-change-transform"
         style={{
           transformStyle: 'preserve-3d',
-          perspective: '1200px',
+          perspective: '1400px',
         }}
       >
         {/* 1. FRONT FACE: #174D32 (Dark emerald green) */}
         <div
           ref={frontFaceRef}
-          className="absolute inset-0 backface-hidden border border-white/[0.08]"
+          className="absolute inset-0 backface-hidden border border-white/[0.12]"
           style={{
             backgroundColor: '#A7F3D0',
             borderRadius: '50%',
@@ -269,7 +275,7 @@ const FullStop3DCube = forwardRef(function FullStop3DCube({ prefersReducedMotion
         {/* 2. BACK FACE: #0B281A (Green-black depth) */}
         <div
           ref={backFaceRef}
-          className="absolute inset-0 backface-hidden border border-black/20"
+          className="absolute inset-0 backface-hidden border border-black/30"
           style={{
             backgroundColor: '#0B281A',
             opacity: 0,
@@ -280,10 +286,10 @@ const FullStop3DCube = forwardRef(function FullStop3DCube({ prefersReducedMotion
         {/* 3. RIGHT FACE: #103B26 (Deep green side) */}
         <div
           ref={rightFaceRef}
-          className="absolute inset-0 backface-hidden border border-black/20"
+          className="absolute inset-0 backface-hidden border border-black/25"
           style={{
             backgroundColor: '#103B26',
-            boxShadow: 'inset 0 0 16px rgba(0,0,0,0.3)',
+            boxShadow: 'inset 0 0 18px rgba(0,0,0,0.35)',
             opacity: 0,
             transform: 'translateZ(0px)',
           }}
@@ -292,7 +298,7 @@ const FullStop3DCube = forwardRef(function FullStop3DCube({ prefersReducedMotion
         {/* 4. LEFT FACE: #123E29 (Deep shadow side) */}
         <div
           ref={leftFaceRef}
-          className="absolute inset-0 backface-hidden border border-black/20"
+          className="absolute inset-0 backface-hidden border border-black/25"
           style={{
             backgroundColor: '#123E29',
             opacity: 0,
@@ -300,13 +306,13 @@ const FullStop3DCube = forwardRef(function FullStop3DCube({ prefersReducedMotion
           }}
         />
 
-        {/* 5. TOP FACE: #246640 (Slightly lighter green catching top light) */}
+        {/* 5. TOP FACE: #246640 (Slightly lighter green catching top light with golden sheen) */}
         <div
           ref={topFaceRef}
-          className="absolute inset-0 backface-hidden border border-white/10"
+          className="absolute inset-0 backface-hidden border border-amber-200/40"
           style={{
             backgroundColor: '#246640',
-            boxShadow: 'inset 0 1px 3px rgba(255,255,255,0.25)',
+            boxShadow: 'inset 0 1px 4px rgba(255,235,175,0.65), inset 0 0 14px rgba(255,230,160,0.25)',
             opacity: 0,
             transform: 'translateZ(0px)',
           }}
@@ -327,9 +333,9 @@ const FullStop3DCube = forwardRef(function FullStop3DCube({ prefersReducedMotion
       {/* Realistic Ambient Contact Shadow on Parchment Floor */}
       <div
         ref={shadowRef}
-        className="absolute -bottom-7 left-1/2 -translate-x-1/2 w-28 h-10 pointer-events-none"
+        className="absolute -bottom-8 left-1/2 -translate-x-1/2 w-36 h-12 pointer-events-none"
         style={{
-          background: 'radial-gradient(ellipse at center, rgba(11,40,26,0.72) 0%, rgba(11,40,26,0.2) 48%, rgba(11,40,26,0) 72%)',
+          background: 'radial-gradient(ellipse at center, rgba(11,40,26,0.76) 0%, rgba(11,40,26,0.22) 50%, rgba(11,40,26,0) 74%)',
           borderRadius: '50%',
           opacity: 0,
           transform: 'rotateX(68deg) scale(0.6)',

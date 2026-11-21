@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { X, ShieldCheck, Truck, Store, ArrowRight, Loader2 } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { X, ShieldCheck, Truck, Store, ArrowRight, Loader2, Lock } from 'lucide-react';
 import { useShop, CITIES } from '../../context/ShopContext';
 import * as api from '../../services/api';
 
@@ -12,12 +12,15 @@ export default function CheckoutModal() {
     selectedBranchId,
     setOrderSuccess,
     refreshCart,
+    isAuthenticated,
+    currentUser,
+    setIsLoginModalOpen,
   } = useShop();
 
   const [fulfilment, setFulfilment] = useState('DELIVERY');
   const [formData, setFormData] = useState({
-    name: 'Priya Sharma',
-    phone: '+91 98765 43210',
+    name: currentUser?.name || 'Priya Sharma',
+    phone: currentUser?.phone || '+91 98765 43210',
     address: '402, Highline Residency, 12th Main Road',
     city: selectedCity,
     pincode: '560034',
@@ -26,7 +29,60 @@ export default function CheckoutModal() {
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState(null);
 
+  // Update name if user logs in
+  useEffect(() => {
+    if (currentUser?.name) {
+      setFormData((prev) => ({
+        ...prev,
+        name: currentUser.name,
+        phone: currentUser.phone || prev.phone,
+      }));
+    }
+  }, [currentUser]);
+
   if (!isCheckoutOpen) return null;
+
+  // Unauthenticated protection modal view
+  if (!isAuthenticated) {
+    return (
+      <div className="fixed inset-0 z-50 overflow-y-auto select-none flex items-center justify-center p-4">
+        <div
+          onClick={() => setIsCheckoutOpen(false)}
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm transition-opacity"
+        />
+        <div className="relative w-full max-w-md bg-[#FFFDF8] border border-[#E2D7C6] rounded-3xl shadow-2xl p-6 sm:p-8 z-10 text-center animate-fade-in-up">
+          <div className="w-14 h-14 rounded-2xl bg-[#183D2B] text-white flex items-center justify-center mx-auto mb-4 shadow-md">
+            <Lock className="w-7 h-7 text-[#A5C7AA]" />
+          </div>
+          <h2 className="text-lg font-bold text-[#183D2B]">
+            Sign in to Complete Checkout
+          </h2>
+          <p className="text-xs text-[#756B5E] mt-2 leading-relaxed">
+            StockSure maintains guaranteed live stock reservations during checkout. Please sign in or register to secure your items and place your order.
+          </p>
+          <div className="mt-6 flex flex-col gap-2.5">
+            <button
+              type="button"
+              onClick={() => {
+                setIsCheckoutOpen(false);
+                setIsLoginModalOpen(true);
+              }}
+              className="w-full py-3 rounded-xl bg-[#183D2B] hover:bg-[#245C3A] text-white text-xs sm:text-sm font-semibold shadow-md transition-colors cursor-pointer"
+            >
+              Sign In or Register
+            </button>
+            <button
+              type="button"
+              onClick={() => setIsCheckoutOpen(false)}
+              className="w-full py-2 text-xs text-[#756B5E] hover:text-[#292722] cursor-pointer"
+            >
+              Return to Cart
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const totalRupees = Math.round(cart.total_paise / 100);
   const deliveryFee = fulfilment === 'PICKUP' || totalRupees >= 500 ? 0 : 40;
@@ -38,6 +94,12 @@ export default function CheckoutModal() {
 
   const handlePlaceOrder = async (e) => {
     e.preventDefault();
+    if (!isAuthenticated) {
+      setIsCheckoutOpen(false);
+      setIsLoginModalOpen(true);
+      return;
+    }
+
     setLoading(true);
     setErrorMsg(null);
 
@@ -138,7 +200,7 @@ export default function CheckoutModal() {
                 }`}
               >
                 <Truck className="w-4 h-4 text-[#A5C7AA]" />
-                <span>Home Delivery</span>
+                <span>Doorstep Delivery</span>
               </button>
 
               <button
@@ -151,17 +213,17 @@ export default function CheckoutModal() {
                 }`}
               >
                 <Store className="w-4 h-4 text-[#A5C7AA]" />
-                <span>Store Pickup</span>
+                <span>Express Store Pickup</span>
               </button>
             </div>
           </div>
 
-          {/* Delivery & Contact Fields */}
-          <div className="space-y-3.5">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {/* Customer & Address Form */}
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="text-xs font-medium text-[#756B5E] block mb-1">
-                  Full Name
+                  Recipient Name
                 </label>
                 <input
                   type="text"
@@ -175,7 +237,7 @@ export default function CheckoutModal() {
 
               <div>
                 <label className="text-xs font-medium text-[#756B5E] block mb-1">
-                  Phone Number
+                  Contact Phone
                 </label>
                 <input
                   type="tel"
@@ -192,7 +254,7 @@ export default function CheckoutModal() {
               <>
                 <div>
                   <label className="text-xs font-medium text-[#756B5E] block mb-1">
-                    Street Address
+                    Delivery Address
                   </label>
                   <input
                     type="text"
@@ -204,7 +266,7 @@ export default function CheckoutModal() {
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="text-xs font-medium text-[#756B5E] block mb-1">
                       City
@@ -225,7 +287,7 @@ export default function CheckoutModal() {
 
                   <div>
                     <label className="text-xs font-medium text-[#756B5E] block mb-1">
-                      PIN Code
+                      Pincode
                     </label>
                     <input
                       type="text"

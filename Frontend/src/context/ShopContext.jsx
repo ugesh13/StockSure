@@ -13,15 +13,20 @@ export const CITIES = [
 ];
 
 export function ShopProvider({ children }) {
+  const [currentUser, setCurrentUser] = useState(() => api.getCurrentUser());
   const [session, setSession] = useState(null);
   const [cart, setCart] = useState({ lines: [], total_paise: 0, item_count: 0 });
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
+  const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
+  const [selectedProductQuickView, setSelectedProductQuickView] = useState(null);
   const [orderSuccess, setOrderSuccess] = useState(null);
   const [selectedCity, setSelectedCity] = useState(CITIES[0].city);
   const [selectedBranchId, setSelectedBranchId] = useState(CITIES[0].branchId);
   const [toastMessage, setToastMessage] = useState(null);
   const [loadingCart, setLoadingCart] = useState(false);
+
+  const isAuthenticated = Boolean(currentUser?.token);
 
   // Initialize session and cart
   useEffect(() => {
@@ -44,7 +49,7 @@ export function ShopProvider({ children }) {
     return () => {
       active = false;
     };
-  }, []);
+  }, [currentUser]);
 
   const showToast = useCallback((msg) => {
     setToastMessage(msg);
@@ -61,6 +66,37 @@ export function ShopProvider({ children }) {
       console.warn('Could not refresh cart:', err.message);
     }
   }, []);
+
+  const loginUser = useCallback(
+    async (email, password) => {
+      const user = await api.login({ email, password });
+      setCurrentUser(user);
+      setSession(user);
+      await refreshCart();
+      return user;
+    },
+    [refreshCart]
+  );
+
+  const registerUser = useCallback(
+    async ({ name, email, password, phone }) => {
+      const user = await api.register({ name, email, password, phone });
+      setCurrentUser(user);
+      setSession(user);
+      await refreshCart();
+      return user;
+    },
+    [refreshCart]
+  );
+
+  const logoutUser = useCallback(async () => {
+    await api.logout();
+    setCurrentUser(null);
+    const guestSess = await api.getSession();
+    setSession(guestSess);
+    await refreshCart();
+    showToast('Signed out successfully');
+  }, [refreshCart, showToast]);
 
   const addItemToCart = useCallback(
     async (product, qty = 1) => {
@@ -150,6 +186,15 @@ export function ShopProvider({ children }) {
   return (
     <ShopContext.Provider
       value={{
+        currentUser,
+        isAuthenticated,
+        login: loginUser,
+        register: registerUser,
+        logout: logoutUser,
+        isLoginModalOpen,
+        setIsLoginModalOpen,
+        selectedProductQuickView,
+        setSelectedProductQuickView,
         session,
         cart,
         loadingCart,

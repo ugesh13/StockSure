@@ -4,7 +4,13 @@ import { useShop } from '../../context/ShopContext';
 import { getProductImage } from '../../data/productImages';
 
 export default function ProductCard({ product }) {
-  const { addItemToCart, updateItemQty, getItemQtyInCart, selectedBranchId } = useShop();
+  const {
+    addItemToCart,
+    updateItemQty,
+    getItemQtyInCart,
+    selectedBranchId,
+    setSelectedProductQuickView,
+  } = useShop();
   const [imgError, setImgError] = useState(false);
   const [justAdded, setJustAdded] = useState(false);
 
@@ -47,8 +53,10 @@ export default function ProductCard({ product }) {
   const isFewLeft = available > 0 && available <= 3;
 
   return (
-    <article className="group relative bg-[#FFFDF8] border border-[#E2D7C6] rounded-2xl p-3.5 sm:p-4 flex flex-col justify-between transition-all duration-300 hover:shadow-[0_8px_24px_rgba(24,61,43,0.08)] hover:border-[#183D2B]/30">
-      
+    <article
+      onClick={() => setSelectedProductQuickView(product)}
+      className="group relative bg-[#FFFDF8] border border-[#E2D7C6] rounded-2xl p-3.5 sm:p-4 flex flex-col justify-between transition-all duration-300 hover:shadow-[0_8px_24px_rgba(24,61,43,0.08)] hover:border-[#183D2B]/30 cursor-pointer"
+    >
       {/* Top: Image & Availability Badge */}
       <div>
         <div className="relative w-full aspect-square rounded-xl bg-[#F5F1E8] overflow-hidden mb-3.5 flex items-center justify-center p-2.5">
@@ -112,7 +120,7 @@ export default function ProductCard({ product }) {
             <button
               type="button"
               onClick={handleDecrement}
-              className="w-5 h-5 flex items-center justify-center rounded-full hover:bg-white/20 transition-colors"
+              className="w-5 h-5 flex items-center justify-center rounded-full hover:bg-white/20 transition-colors cursor-pointer"
               aria-label="Decrease quantity"
             >
               <Minus className="w-3 h-3 text-[#A5C7AA]" />
@@ -123,7 +131,7 @@ export default function ProductCard({ product }) {
             <button
               type="button"
               onClick={handleIncrement}
-              className="w-5 h-5 flex items-center justify-center rounded-full hover:bg-white/20 transition-colors"
+              className="w-5 h-5 flex items-center justify-center rounded-full hover:bg-white/20 transition-colors cursor-pointer"
               aria-label="Increase quantity"
             >
               <Plus className="w-3 h-3 text-[#A5C7AA]" />
@@ -156,7 +164,6 @@ export default function ProductCard({ product }) {
           </button>
         )}
       </div>
-
     </article>
   );
 }

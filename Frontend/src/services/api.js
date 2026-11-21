@@ -6,9 +6,30 @@
 const API_BASE = '/api';
 
 /**
+ * Get cached authenticated user if present
+ */
+export function getCurrentUser() {
+  try {
+    const raw = localStorage.getItem('stocksure_auth_user');
+    if (!raw) return null;
+    const user = JSON.parse(raw);
+    return user && user.token ? user : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Get or initialize persistent shopper session
  */
 export async function getSession() {
+  // 1. Check if authenticated user session exists first
+  const authUser = getCurrentUser();
+  if (authUser?.token) {
+    return authUser;
+  }
+
+  // 2. Check cached guest session
   const cached = localStorage.getItem('stocksure_session');
   if (cached) {
     try {
@@ -19,6 +40,7 @@ export async function getSession() {
     }
   }
 
+  // 3. Request fresh guest session from backend
   try {
     const res = await fetch(`${API_BASE}/session`, {
       method: 'POST',
@@ -34,7 +56,6 @@ export async function getSession() {
     console.warn('Could not create backend session, using demo customer fallback', e);
   }
 
-  // Demo mode fallback customer
   const demoFallback = {
     customer_id: 1,
     token: 'demo-token-fallback',
@@ -56,6 +77,85 @@ function getAuthHeaders(session, extra = {}) {
     headers['x-customer-id'] = String(session.customer_id);
   }
   return headers;
+}
+
+/**
+ * Customer Authentication: Login
+ */
+export async function login({ email, password }) {
+  const res = await fetch(`${API_BASE}/auth/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email: email.trim(), password }),
+  });
+
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data?.error?.message || 'Invalid email or password.');
+  }
+
+  // Store active authenticated user and session
+  localStorage.setItem('stocksure_auth_user', JSON.stringify(data));
+  localStorage.setItem('stocksure_session', JSON.stringify(data));
+  return data;
+}
+
+/**
+ * Customer Authentication: Register
+ */
+export async function register({ name, email, password, phone }) {
+  const res = await fetch(`${API_BASE}/auth/register`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      name: name.trim(),
+      email: email.trim(),
+      password,
+      phone: phone?.trim() || undefined,
+    }),
+  });
+
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data?.error?.message || 'Registration failed. Please try again.');
+  }
+
+  localStorage.setItem('stocksure_auth_user', JSON.stringify(data));
+  localStorage.setItem('stocksure_session', JSON.stringify(data));
+  return data;
+}
+
+/**
+ * Customer Authentication: Get Profile
+ */
+export async function getProfile() {
+  const session = await getSession();
+  const res = await fetch(`${API_BASE}/auth/me`, {
+    headers: getAuthHeaders(session),
+  });
+  if (!res.ok) {
+    throw new Error('Failed to load user profile');
+  }
+  return res.json();
+}
+
+/**
+ * Customer Authentication: Logout
+ */
+export async function logout() {
+  const session = getCurrentUser() || (await getSession());
+  try {
+    await fetch(`${API_BASE}/auth/logout`, {
+      method: 'POST',
+      headers: getAuthHeaders(session),
+    });
+  } catch (e) {
+    console.warn('Backend logout warning:', e);
+  } finally {
+    localStorage.removeItem('stocksure_auth_user');
+    localStorage.removeItem('stocksure_session');
+  }
+  return { ok: true };
 }
 
 /**
@@ -238,5 +338,17 @@ export async function getOrder(orderId) {
     headers: getAuthHeaders(session),
   });
   if (!res.ok) throw new Error('Order not found');
+  return res.json();
+}
+
+/**
+ * Fetch caller orders history
+ */
+export async function getMyOrders() {
+  const session = await getSession();
+  const res = await fetch(`${API_BASE}/orders`, {
+    headers: getAuthHeaders(session),
+  });
+  if (!res.ok) throw new Error('Could not fetch orders history');
   return res.json();
 }

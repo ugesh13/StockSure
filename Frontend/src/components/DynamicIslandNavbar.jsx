@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { ShoppingCart } from 'lucide-react';
+import { ShoppingCart, User, LogOut } from 'lucide-react';
+import { useShop } from '../context/ShopContext';
 
 /**
  * DynamicIslandNavbar
@@ -10,19 +11,25 @@ import { ShoppingCart } from 'lucide-react';
  * - Content reveals in an elegant sequence:
  *     1. StockSure Logo & Brand typography
  *     2. Staggered navigation links (About -> Branches -> Our Vision -> Contact)
- *     3. "Start Shopping" button with subtle light-green accent and cart icon
+ *     3. "Start Shopping" button with subtle light-green accent, cart badge, and auth awareness
  * - Settles into a stable, rock-solid glassmorphism navbar once fully expanded.
- * 
- * Props:
- * - revealProgress: number [0.0 - 1.0] (progress of the hero image reveal)
- * - isSettled: boolean (locks navbar in full state once user reaches bottom)
  */
 export default function DynamicIslandNavbar({
   revealProgress = 0,
   isSettled = false,
   onStartShopping,
 }) {
+  const {
+    isAuthenticated,
+    currentUser,
+    logout,
+    setIsLoginModalOpen,
+    cart,
+    setIsCartOpen,
+  } = useShop();
+
   const [activeLink, setActiveLink] = useState('About');
+  const [showUserMenu, setShowUserMenu] = useState(false);
 
   // If before reveal threshold, stay completely hidden
   if (revealProgress < 0.05 && !isSettled) {
@@ -50,7 +57,7 @@ export default function DynamicIslandNavbar({
   const buttonSlide = (1 - buttonOpacity) * 8; // subtle slide of 8px to 0px
 
   const navItems = [
-    { label: 'About', href: '#about' },
+    { label: 'About', href: '#about-us' },
     { label: 'Branches', href: '#branches' },
     { label: 'Our Vision', href: '#vision' },
     { label: 'Contact', href: '#contact' },
@@ -59,6 +66,33 @@ export default function DynamicIslandNavbar({
   const handleNavClick = (e, label) => {
     e.preventDefault();
     setActiveLink(label);
+    if (label === 'About') {
+      const el = document.getElementById('about-us');
+      if (el) el.scrollIntoView({ behavior: 'smooth' });
+      else window.scrollTo({ top: 3800, behavior: 'smooth' });
+    } else if (label === 'Branches' || label === 'Our Vision') {
+      const el = document.getElementById('about-us');
+      if (el) el.scrollIntoView({ behavior: 'smooth' });
+    } else if (label === 'Contact') {
+      const el = document.getElementById('experience-details');
+      if (el) el.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
+
+  const handleLogoClick = () => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleStartShopping = () => {
+    if (isAuthenticated) {
+      if (onStartShopping) {
+        onStartShopping();
+      } else {
+        window.location.hash = '#shop';
+      }
+    } else {
+      setIsLoginModalOpen(true);
+    }
   };
 
   return (
@@ -66,15 +100,15 @@ export default function DynamicIslandNavbar({
       
       {/* Dynamic Island Floating Glass Pill / Navbar */}
       <div
-        className="pointer-events-auto relative flex items-center justify-between overflow-hidden rounded-full transition-all duration-300 ease-out will-change-[width,opacity,box-shadow]"
+        className="pointer-events-auto relative flex items-center justify-between overflow-visible rounded-full transition-all duration-300 ease-out will-change-[width,opacity,box-shadow]"
         style={{
-          // Fluid width expansion: starts at 120px capsule -> expands to 840px full navbar
-          width: expansion < 0.15 ? '120px' : `calc(120px + ${expansion * 720}px)`,
-          maxWidth: '92vw',
+          // Fluid width expansion: starts at 120px capsule -> expands to 860px full navbar
+          width: expansion < 0.15 ? '120px' : `calc(120px + ${expansion * 740}px)`,
+          maxWidth: '94vw',
           height: '52px',
           opacity: Math.min(revealProgress * 2.5, 1),
           // Smoky neutral glassmorphism
-          background: 'rgba(20, 20, 22, 0.48)',
+          background: 'rgba(20, 20, 22, 0.58)',
           backdropFilter: 'blur(24px) saturate(180%)',
           WebkitBackdropFilter: 'blur(24px) saturate(180%)',
           border: '1px solid rgba(255, 255, 255, 0.14)',
@@ -86,10 +120,13 @@ export default function DynamicIslandNavbar({
         }}
       >
         {/* Left: Brand Logo & Typography */}
-        <div className="flex items-center gap-2.5 pl-3.5 sm:pl-4 shrink-0">
-          
+        <div
+          onClick={handleLogoClick}
+          className="flex items-center gap-2.5 pl-3.5 sm:pl-4 shrink-0 cursor-pointer select-none group"
+          title="Scroll to top"
+        >
           {/* StockSure Emblem / Leaf Icon */}
-          <div className="w-7 h-7 rounded-full bg-white/[0.08] border border-white/20 flex items-center justify-center shrink-0 shadow-sm transition-transform duration-300 hover:scale-105">
+          <div className="w-7 h-7 rounded-full bg-white/[0.08] border border-white/20 flex items-center justify-center shrink-0 shadow-sm transition-transform duration-300 group-hover:scale-105">
             <svg
               className="w-3.5 h-3.5 text-[#C8E8D0]"
               viewBox="0 0 24 24"
@@ -128,7 +165,6 @@ export default function DynamicIslandNavbar({
           >
             {navItems.map((item, idx) => {
               const isItemActive = activeLink === item.label;
-              // Micro stagger calculation per link
               const linkStagger = Math.min(
                 Math.max((expansion - 0.45 - idx * 0.06) / 0.18, 0),
                 1
@@ -150,7 +186,6 @@ export default function DynamicIslandNavbar({
                   }}
                 >
                   {item.label}
-                  {/* Subtle active pill indicator */}
                   {isItemActive && (
                     <span className="absolute bottom-1 left-1/2 -translate-x-1/2 w-1.5 h-1.5 rounded-full bg-[#C8E8D0] shadow-[0_0_8px_#C8E8D0]" />
                   )}
@@ -160,29 +195,86 @@ export default function DynamicIslandNavbar({
           </nav>
         )}
 
-        {/* Right: Start Shopping Button with Gentle Slide & Cart Icon */}
-        <div className="pr-1.5 sm:pr-2 shrink-0">
+        {/* Right Section: Auth State, Cart Badge & Start Shopping */}
+        <div className="pr-1.5 sm:pr-2.5 shrink-0 flex items-center gap-1.5 sm:gap-2">
           {buttonVisible ? (
-            <button
-              type="button"
-              onClick={() => {
-                setActiveLink('Shopping');
-                if (onStartShopping) {
-                  onStartShopping();
-                } else {
-                  window.location.hash = '#shop';
-                }
-              }}
-              className="flex items-center gap-2 px-4 py-2 rounded-full bg-emerald-500/15 hover:bg-emerald-500/25 border border-[#C8E8D0]/30 hover:border-[#C8E8D0]/60 text-[#DDF3E4] hover:text-white text-xs font-medium tracking-wide shadow-sm transition-all duration-200 active:scale-95 cursor-pointer"
-              style={{
-                opacity: buttonOpacity,
-                transform: `translateX(${buttonSlide}px)`,
-              }}
-            >
-              <span className="hidden sm:inline">Start Shopping</span>
-              <span className="sm:hidden">Shop</span>
-              <ShoppingCart className="w-3.5 h-3.5 text-[#C8E8D0]" />
-            </button>
+            <>
+              {/* Authenticated User Pill or Sign In Button */}
+              {isAuthenticated ? (
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setShowUserMenu(!showUserMenu)}
+                    className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-white/[0.08] hover:bg-white/[0.14] border border-white/15 text-stone-200 text-xs transition-all"
+                    title={currentUser?.email}
+                  >
+                    <User className="w-3.5 h-3.5 text-[#C8E8D0]" />
+                    <span className="max-w-[70px] truncate hidden sm:inline font-medium">
+                      {currentUser?.name?.split(' ')[0] || 'Account'}
+                    </span>
+                  </button>
+
+                  {/* Dropdown Menu */}
+                  {showUserMenu && (
+                    <div className="absolute right-0 top-10 mt-1 w-44 rounded-2xl bg-[#0f1d16] border border-emerald-500/30 shadow-2xl p-2 z-50 text-xs animate-fade-in-up">
+                      <div className="px-2.5 py-1.5 border-b border-white/10 text-stone-300">
+                        <p className="font-semibold text-white truncate">{currentUser?.name}</p>
+                        <p className="text-[10px] text-stone-400 truncate">{currentUser?.email}</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowUserMenu(false);
+                          logout();
+                        }}
+                        className="w-full mt-1 flex items-center gap-2 px-2.5 py-2 text-rose-300 hover:bg-rose-500/10 rounded-xl transition-colors cursor-pointer text-left"
+                      >
+                        <LogOut className="w-3.5 h-3.5" />
+                        <span>Sign Out</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setIsLoginModalOpen(true)}
+                  className="hidden sm:inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-white/[0.06] hover:bg-white/[0.12] border border-white/10 text-stone-300 hover:text-white text-xs font-light transition-all"
+                >
+                  Sign In
+                </button>
+              )}
+
+              {/* Cart Drawer Trigger */}
+              <button
+                type="button"
+                onClick={() => setIsCartOpen(true)}
+                className="relative p-2 rounded-full bg-white/[0.08] hover:bg-white/[0.16] border border-white/15 text-stone-200 transition-all cursor-pointer"
+                aria-label="View Shopping Cart"
+              >
+                <ShoppingCart className="w-3.5 h-3.5 text-[#C8E8D0]" />
+                {cart.item_count > 0 && (
+                  <span className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full bg-[#A5C7AA] text-[#183D2B] text-[10px] font-bold flex items-center justify-center leading-none shadow-md">
+                    {cart.item_count}
+                  </span>
+                )}
+              </button>
+
+              {/* Start Shopping Button */}
+              <button
+                type="button"
+                onClick={handleStartShopping}
+                className="flex items-center gap-1.5 sm:gap-2 px-3.5 sm:px-4 py-2 rounded-full bg-emerald-500/20 hover:bg-emerald-500/30 border border-[#C8E8D0]/40 hover:border-[#C8E8D0]/70 text-[#DDF3E4] hover:text-white text-xs font-medium tracking-wide shadow-sm transition-all duration-200 active:scale-95 cursor-pointer"
+                style={{
+                  opacity: buttonOpacity,
+                  transform: `translateX(${buttonSlide}px)`,
+                }}
+              >
+                <span className="hidden sm:inline">Start Shopping</span>
+                <span className="sm:hidden">Shop</span>
+                <span className="text-[#C8E8D0] font-bold text-xs">→</span>
+              </button>
+            </>
           ) : (
             // Small subtle pulse indicator when island is in compact pill mode
             <div className="w-2 h-2 mr-3 rounded-full bg-[#C8E8D0]/60 animate-pulse" />

@@ -19,6 +19,7 @@ export default function CartDrawer() {
   const totalRupees = Math.round(cart.total_paise / 100);
   const deliveryFee = totalRupees >= 500 || totalRupees === 0 ? 0 : 40;
   const grandTotal = totalRupees + deliveryFee;
+  const hasUnavailableItems = cart.lines.some((l) => l.ok === false);
 
   const handleProceedCheckout = () => {
     setIsCartOpen(false);
@@ -190,10 +191,16 @@ export default function CartDrawer() {
               </div>
 
               {/* Action Buttons */}
+              {hasUnavailableItems && (
+                <div className="p-2.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-[11px] leading-tight">
+                  One or more items exceed current branch stock. Please adjust quantities to proceed.
+                </div>
+              )}
               <button
                 type="button"
+                disabled={hasUnavailableItems}
                 onClick={handleProceedCheckout}
-                className="w-full py-3 rounded-full bg-[#183D2B] hover:bg-[#245C3A] text-white text-xs sm:text-sm font-semibold tracking-wide shadow-md flex items-center justify-center gap-2 transition-all active:scale-95 cursor-pointer"
+                className="w-full py-3 rounded-full bg-[#183D2B] hover:bg-[#245C3A] text-white text-xs sm:text-sm font-semibold tracking-wide shadow-md flex items-center justify-center gap-2 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
               >
                 <span>Proceed to Checkout</span>
                 <ArrowRight className="w-4 h-4 text-[#A5C7AA]" />
