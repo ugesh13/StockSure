@@ -3,6 +3,7 @@ import './globals.css';
 import { AuthProvider } from '@/context/AuthContext';
 import { CartProvider } from '@/context/CartContext';
 import PlantyChat from '@/components/planty/PlantyChat';
+import GlobalCartAndModals from '@/components/GlobalCartAndModals';
 
 export const metadata: Metadata = {
   title: 'StockSure | Botanical Luxury Sanctuary & Nursery',
@@ -22,6 +23,7 @@ export default function RootLayout({
           <CartProvider>
             {children}
             <PlantyChat />
+            <GlobalCartAndModals />
           </CartProvider>
         </AuthProvider>
       </body>

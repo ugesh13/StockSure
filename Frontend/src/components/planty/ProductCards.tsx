@@ -51,7 +51,7 @@ function ProductTile({
     : '₹249';
 
   const imageSrc = imgError
-    ? '/products/money-plant.jpg'
+    ? '/plants/money-plant.jpg'
     : formatImageUrl(product.image_url || product.imageUrl, product.name);
 
   const handleAddToCart = (e: React.MouseEvent) => {

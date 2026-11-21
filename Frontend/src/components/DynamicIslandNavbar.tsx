@@ -8,9 +8,14 @@ import {
   User,
   Menu,
   X,
+  ShoppingBag,
 } from 'lucide-react';
+import { useAuth } from '@/context/AuthContext';
+import { useCart } from '@/context/CartContext';
 
 export default function DynamicIslandNavbar() {
+  const { user, openAuthModal } = useAuth();
+  const { cartCount, setIsCartOpen } = useCart();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [activeSection, setActiveSection] = useState<'home' | 'about' | 'branches' | 'contact'>('home');
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -160,28 +165,85 @@ export default function DynamicIslandNavbar() {
             </motion.a>
           </motion.nav>
 
-          {/* Right: Spacing Divider & Profile/Login Icon */}
-          <div className="hidden md:flex items-center flex-shrink-0">
-            <span className="h-4 w-[1px] bg-white/20 mr-3" aria-hidden="true" />
-            <Link
-              href="/login"
-              aria-label="Login / Profile"
-              className="p-2 rounded-full transition-all duration-300 text-white/85 hover:text-white hover:bg-white/10"
-              title="Login / Account"
+          {/* Right: Cart Button & Prominent Sign In / Register Button */}
+          <div className="hidden md:flex items-center gap-2 flex-shrink-0">
+            <span className="h-4 w-[1px] bg-white/20 mr-1" aria-hidden="true" />
+
+            {/* Shopping Cart Button */}
+            <button
+              type="button"
+              onClick={() => setIsCartOpen(true)}
+              aria-label={`Cart with ${cartCount} items`}
+              className="relative p-2 rounded-full transition-all duration-300 text-white/90 hover:text-white hover:bg-white/10 flex items-center justify-center"
+              title="Shopping Cart"
             >
-              <User className="w-4 h-4" />
-            </Link>
+              <ShoppingBag className="w-4 h-4" />
+              {cartCount > 0 && (
+                <span className="absolute -top-1 -right-1 bg-moss text-cream text-[10px] font-bold px-1.5 py-0.2 rounded-full border border-[#121E17] shadow-xs">
+                  {cartCount}
+                </span>
+              )}
+            </button>
+
+            {/* Clear, Legible Authentication / Profile Button */}
+            {user ? (
+              <Link
+                href="/profile"
+                className="flex items-center gap-2 py-1.5 px-3.5 rounded-full bg-white/15 hover:bg-white/25 text-white text-xs font-semibold border border-white/20 transition-all duration-300 shadow-xs"
+                title="Manage Botanical Profile & Orders"
+              >
+                <div className="w-5 h-5 rounded-full bg-moss text-white flex items-center justify-center text-[10px] font-bold">
+                  {user.name ? user.name.charAt(0).toUpperCase() : 'U'}
+                </div>
+                <span>Hi, {user.name ? user.name.split(' ')[0] : 'Shopper'}</span>
+              </Link>
+            ) : (
+              <button
+                type="button"
+                onClick={() => openAuthModal('login')}
+                className="flex items-center gap-1.5 py-1.5 px-4 rounded-full bg-moss hover:bg-moss-700 text-white text-xs font-bold transition-all duration-300 shadow-xs border border-white/10"
+              >
+                <User className="w-3.5 h-3.5 text-white" />
+                <span>Sign In / Register</span>
+              </button>
+            )}
           </div>
 
-          {/* Mobile Right Controls: Profile & Toggle Button */}
+          {/* Mobile Right Controls: Cart, Profile & Menu Toggle */}
           <div className="flex items-center gap-1.5 md:hidden">
-            <Link
-              href="/login"
-              aria-label="Login / Profile"
-              className="p-2 rounded-full transition-colors text-white/85 hover:text-white"
+            <button
+              type="button"
+              onClick={() => setIsCartOpen(true)}
+              aria-label="Shopping Cart"
+              className="relative p-2 rounded-full text-white/90 hover:text-white"
             >
-              <User className="w-4 h-4" />
-            </Link>
+              <ShoppingBag className="w-4 h-4" />
+              {cartCount > 0 && (
+                <span className="absolute -top-0.5 -right-0.5 bg-moss text-cream text-[9px] font-bold px-1 rounded-full">
+                  {cartCount}
+                </span>
+              )}
+            </button>
+
+            {user ? (
+              <Link
+                href="/profile"
+                aria-label="Profile"
+                className="p-1.5 rounded-full text-white/90 hover:text-white"
+              >
+                <div className="w-5 h-5 rounded-full bg-moss text-white flex items-center justify-center text-[10px] font-bold">
+                  {user.name ? user.name.charAt(0).toUpperCase() : 'U'}
+                </div>
+              </Link>
+            ) : (
+              <button
+                type="button"
+                onClick={() => openAuthModal('login')}
+                className="px-2.5 py-1 rounded-full bg-moss text-white text-[11px] font-bold"
+              >
+                Sign In
+              </button>
+            )}
 
             <button
               type="button"
@@ -228,13 +290,45 @@ export default function DynamicIslandNavbar() {
                 Contact Us
               </a>
 
-              <Link
-                href="/login"
-                onClick={() => setMobileMenuOpen(false)}
-                className="py-2 px-3 rounded-[14px] transition-colors text-white/85 hover:bg-white/10"
+              <button
+                type="button"
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  setIsCartOpen(true);
+                }}
+                className="w-full text-left py-2 px-3 rounded-[14px] transition-colors text-white/90 hover:bg-white/10 flex items-center justify-between"
               >
-                Login / Account
-              </Link>
+                <span className="flex items-center gap-2">
+                  <ShoppingBag className="w-4 h-4 text-moss" />
+                  <span>Shopping Basket</span>
+                </span>
+                <span className="px-2 py-0.5 rounded-full bg-moss text-xs font-bold text-white">
+                  {cartCount} items
+                </span>
+              </button>
+
+              {user ? (
+                <Link
+                  href="/profile"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="py-2 px-3 rounded-[14px] transition-colors bg-white/10 text-white font-semibold flex items-center justify-between"
+                >
+                  <span>My Profile & Orders</span>
+                  <span className="text-xs text-moss">{user.name}</span>
+                </Link>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMobileMenuOpen(false);
+                    openAuthModal('login');
+                  }}
+                  className="w-full text-left py-2 px-3 rounded-[14px] transition-colors bg-moss text-white font-bold flex items-center gap-2"
+                >
+                  <User className="w-4 h-4" />
+                  <span>Sign In / Register</span>
+                </button>
+              )}
             </nav>
           </div>
         )}

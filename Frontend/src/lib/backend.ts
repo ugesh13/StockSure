@@ -193,9 +193,24 @@ export function clearStoredSession(): void {
 }
 
 export function formatImageUrl(url?: string | null, plantName?: string): string {
+  if (plantName && typeof plantName === 'string') {
+    const slug = plantName
+      .split(',')[0]
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '');
+    if (slug) {
+      return `/plants/${slug}.jpg`;
+    }
+  }
+
   if (url && typeof url === 'string' && url.trim()) {
     const clean = url.trim();
     if (clean.startsWith('http://') || clean.startsWith('https://')) {
+      return clean;
+    }
+    if (clean.startsWith('/plants/') || clean.startsWith('/products/')) {
       return clean;
     }
     if (clean.startsWith('/static/plants/')) {
@@ -210,19 +225,7 @@ export function formatImageUrl(url?: string | null, plantName?: string): string 
     return `/backend/${clean}`;
   }
 
-  if (plantName && typeof plantName === 'string') {
-    const slug = plantName
-      .split(',')[0]
-      .toLowerCase()
-      .trim()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-|-$/g, '');
-    if (slug) {
-      return `/backend/static/plants/${slug}.jpg`;
-    }
-  }
-
-  return '/products/money-plant.jpg';
+  return '/plants/money-plant.jpg';
 }
 
 export function adaptProduct(bp: BackendProduct): Product {

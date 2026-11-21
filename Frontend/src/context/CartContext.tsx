@@ -16,6 +16,10 @@ interface CartContextType {
   total: number;
   freeShippingThreshold: number;
   freeShippingRemaining: number;
+  appliedCoupon: string | null;
+  discount: number;
+  applyCoupon: (code: string) => { success: boolean; message: string };
+  removeCoupon: () => void;
   isCartOpen: boolean;
   setIsCartOpen: (open: boolean) => void;
   isCheckoutOpen: boolean;
@@ -52,6 +56,8 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
   const [hasMounted, setHasMounted] = useState(false);
+  const [appliedCoupon, setAppliedCoupon] = useState<string | null>(null);
+  const [discount, setDiscount] = useState<number>(0);
 
   // Fetch real branches from backend on mount
   useEffect(() => {
@@ -195,8 +201,48 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const subtotal = items.reduce((sum, item) => sum + item.product.price * item.quantity, 0);
   // In Rupees: Free delivery on ₹999+, otherwise ₹49 flat
   const freeShippingThreshold = 999;
-  const shippingCost = subtotal >= freeShippingThreshold || items.length === 0 ? 0 : 49;
-  const total = subtotal + shippingCost;
+  const rawShippingCost = subtotal >= freeShippingThreshold || items.length === 0 ? 0 : 49;
+  const isFreeShipCoupon = appliedCoupon === 'FREESHIP';
+  const shippingCost = isFreeShipCoupon ? 0 : rawShippingCost;
+
+  // Coupon application logic
+  const applyCoupon = (code: string) => {
+    const clean = code.trim().toUpperCase();
+    if (clean === 'STOCKSURE10') {
+      const disc = Math.round(subtotal * 0.1);
+      setDiscount(disc);
+      setAppliedCoupon('STOCKSURE10');
+      return { success: true, message: `STOCKSURE10 applied: ₹${disc} discount (10% off)` };
+    }
+    if (clean === 'BANGALORE20') {
+      const disc = Math.round(subtotal * 0.2);
+      setDiscount(disc);
+      setAppliedCoupon('BANGALORE20');
+      return { success: true, message: `BANGALORE20 applied: ₹${disc} discount (20% off)` };
+    }
+    if (clean === 'FREESHIP') {
+      setDiscount(0);
+      setAppliedCoupon('FREESHIP');
+      return { success: true, message: 'FREESHIP applied: Free Delivery Unlocked!' };
+    }
+    if (clean === 'FIRSTPLANT') {
+      if (subtotal < 300) {
+        return { success: false, message: 'FIRSTPLANT requires a minimum subtotal of ₹300' };
+      }
+      const disc = Math.min(100, subtotal);
+      setDiscount(disc);
+      setAppliedCoupon('FIRSTPLANT');
+      return { success: true, message: `FIRSTPLANT applied: ₹${disc} flat off!` };
+    }
+    return { success: false, message: 'Invalid coupon code. Try STOCKSURE10 or BANGALORE20.' };
+  };
+
+  const removeCoupon = () => {
+    setAppliedCoupon(null);
+    setDiscount(0);
+  };
+
+  const total = Math.max(0, subtotal - discount + shippingCost);
   const freeShippingRemaining = Math.max(0, freeShippingThreshold - subtotal);
 
   return (
@@ -209,6 +255,10 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         total,
         freeShippingThreshold,
         freeShippingRemaining,
+        appliedCoupon,
+        discount,
+        applyCoupon,
+        removeCoupon,
         isCartOpen,
         setIsCartOpen,
         isCheckoutOpen,
