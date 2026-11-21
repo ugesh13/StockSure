@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { backend, adaptProduct, Product } from '@/lib/backend';
+import { backend, adaptProduct, formatImageUrl, Product } from '@/lib/backend';
 import { useCart } from '@/context/CartContext';
 import { ROUTE_MAP, executeNavigation } from './actions';
 
@@ -109,10 +109,26 @@ export function usePlantyChat() {
 
       try {
         const data = await backend.sendChatMessage(text, { city: selectedBranch?.city || 'Bengaluru' });
-        const botText = typeof data.reply === 'string' ? data.reply : 'I have received your message.';
+        let botText = typeof data.reply === 'string' ? data.reply : 'I have received your message.';
 
         const actionPayload: Record<string, any> = {};
         const action = data.action;
+
+        // Enhanced plant care handler for general queries
+        if (
+          /care tips?|how to care|plant care/i.test(text) &&
+          botText.includes('We do not have curated care notes for that plant yet')
+        ) {
+          botText = `🌿 Here are essential horticultural care tips from StockSure:\n\n• 💧 Watering: Water thoroughly only when the top 2 inches of soil feel dry. Avoid overwatering!\n• ☀️ Sunlight: Most foliage plants thrive best in bright, indirect sunlight.\n• 🌱 Soil & Drainage: Use free-draining, peat-free organic substrate with drainage holes.\n\nTap a plant below for customized care notes:`;
+          const careSuggestions = [
+            'Care for Money plant',
+            'Care for Snake plant',
+            'Care for Peace Lily',
+            'Care for Monstera',
+            'Care for ZZ plant',
+          ];
+          setSuggestions(careSuggestions);
+        }
 
         if (action) {
           const { type, payload } = action;
@@ -129,7 +145,7 @@ export function usePlantyChat() {
                     product_id: r.product_id || r.id,
                     name: r.name,
                     price_paise: r.price_paise,
-                    image_url: r.image_url,
+                    image_url: formatImageUrl(r.image_url, r.name),
                     category: r.category,
                   }));
                 } else {

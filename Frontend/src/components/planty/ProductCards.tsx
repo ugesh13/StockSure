@@ -1,9 +1,10 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Plus, Eye } from 'lucide-react';
+import { Plus, Eye, Check } from 'lucide-react';
 import { formatPaiseToInr } from './actions';
-import { formatImageUrl } from '@/lib/backend';
+import { formatImageUrl, adaptProduct } from '@/lib/backend';
+import { useCart } from '@/context/CartContext';
 
 interface ProductCardsProps {
   products?: any[];
@@ -30,8 +31,18 @@ export default function ProductCards({ products = [], onSelectProduct, onPromptA
   );
 }
 
-function ProductTile({ product, onSelectProduct, onPromptAddToCart }: { product: any; onSelectProduct?: (p: any) => void; onPromptAddToCart?: (p: any) => void }) {
+function ProductTile({
+  product,
+  onSelectProduct,
+  onPromptAddToCart,
+}: {
+  product: any;
+  onSelectProduct?: (p: any) => void;
+  onPromptAddToCart?: (p: any) => void;
+}) {
   const [imgError, setImgError] = useState(false);
+  const [isAdded, setIsAdded] = useState(false);
+  const { addToCart } = useCart();
 
   const priceFormatted = product.price_paise
     ? formatPaiseToInr(product.price_paise)
@@ -40,16 +51,45 @@ function ProductTile({ product, onSelectProduct, onPromptAddToCart }: { product:
     : '₹249';
 
   const imageSrc = imgError
-    ? '/products/snake-plant.jpg'
-    : formatImageUrl(product.image_url || product.imageUrl);
+    ? '/products/money-plant.jpg'
+    : formatImageUrl(product.image_url || product.imageUrl, product.name);
+
+  const handleAddToCart = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    try {
+      const adapted = adaptProduct({
+        id: Number(product.id || product.product_id || 1),
+        sku: product.sku || `PLANT-${product.id || product.product_id || 'item'}`,
+        name: product.name || 'Botanical Specimen',
+        brand: product.brand || 'StockSure Nursery',
+        category: product.category || 'Indoor foliage',
+        tags: product.tags || ['indoor', 'foliage'],
+        price_paise: product.price_paise || (product.price ? product.price * 100 : 24900),
+        image_url: product.image_url || product.imageUrl,
+        image_credit: 'StockSure Nursery Verified',
+        image_status: 'ok',
+        available_total: product.available_total || 20,
+      });
+
+      addToCart(adapted, 1);
+      setIsAdded(true);
+      setTimeout(() => setIsAdded(false), 2000);
+
+      if (onPromptAddToCart) {
+        onPromptAddToCart(product);
+      }
+    } catch (err) {
+      console.error('Error adding to cart from Planty:', err);
+    }
+  };
 
   return (
     <div
       onClick={() => onSelectProduct && onSelectProduct(product)}
-      className="shrink-0 w-36 sm:w-40 bg-[var(--planty-card-bg,#E6F0D4)] border border-[var(--planty-card-border,#CFE0B5)] rounded-2xl p-2.5 flex flex-col justify-between transition-transform duration-200 hover:-translate-y-0.5 hover:shadow-sm cursor-pointer select-none"
+      className="shrink-0 w-40 sm:w-44 bg-[var(--planty-card-bg,#E6F0D4)] border border-[var(--planty-card-border,#CFE0B5)] rounded-2xl p-2.5 flex flex-col justify-between transition-transform duration-200 hover:-translate-y-0.5 hover:shadow-sm cursor-pointer select-none"
     >
       {/* Plant Image Container */}
-      <div className="relative w-full aspect-square rounded-xl bg-white/60 overflow-hidden mb-2 flex items-center justify-center p-1.5 border border-black/5">
+      <div className="relative w-full aspect-square rounded-xl bg-white/70 overflow-hidden mb-2 flex items-center justify-center p-1.5 border border-black/5">
         <img
           src={imageSrc}
           alt={product.name || 'Botanical specimen'}
@@ -73,7 +113,7 @@ function ProductTile({ product, onSelectProduct, onPromptAddToCart }: { product:
       </div>
 
       {/* Action Buttons Row */}
-      <div className="flex items-center justify-between gap-1.5 pt-1 border-t border-[var(--planty-card-border,#CFE0B5)]/60">
+      <div className="flex items-center justify-between gap-1.5 pt-1.5 border-t border-[var(--planty-card-border,#CFE0B5)]/60">
         <button
           type="button"
           onClick={(e) => {
@@ -89,15 +129,26 @@ function ProductTile({ product, onSelectProduct, onPromptAddToCart }: { product:
 
         <button
           type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            if (onPromptAddToCart) onPromptAddToCart(product);
-          }}
-          className="w-7 h-7 rounded-full bg-[var(--planty-send-btn,#4C9A3A)] hover:bg-[var(--planty-send-btn-hover,#3E842E)] text-white flex items-center justify-center shadow-xs transition-transform active:scale-95"
+          onClick={handleAddToCart}
+          className={`inline-flex items-center gap-1 text-[11px] font-bold py-1 px-2.5 rounded-full shadow-xs transition-all active:scale-95 ${
+            isAdded
+              ? 'bg-emerald-600 text-white'
+              : 'bg-[var(--planty-send-btn,#4C9A3A)] hover:bg-[var(--planty-send-btn-hover,#3E842E)] text-white'
+          }`}
           title={`Add ${product.name} to cart`}
           aria-label={`Add ${product.name} to cart`}
         >
-          <Plus className="w-4 h-4" />
+          {isAdded ? (
+            <>
+              <Check className="w-3 h-3" />
+              <span>Added!</span>
+            </>
+          ) : (
+            <>
+              <Plus className="w-3.5 h-3.5" />
+              <span>Add</span>
+            </>
+          )}
         </button>
       </div>
     </div>

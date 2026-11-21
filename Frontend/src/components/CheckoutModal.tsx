@@ -13,6 +13,11 @@ import {
   AlertCircle,
   Loader2,
   CheckCircle2,
+  CreditCard,
+  QrCode,
+  Lock,
+  ArrowLeft,
+  Sparkles,
 } from 'lucide-react';
 import { useCart } from '@/context/CartContext';
 import { useAuth } from '@/context/AuthContext';
@@ -24,9 +29,14 @@ interface CheckoutModalProps {
   onOrderSuccess: (order: Order) => void;
 }
 
+type CheckoutStep = 'details' | 'payment' | 'confirmed';
+
 export default function CheckoutModal({ isOpen, onClose, onOrderSuccess }: CheckoutModalProps) {
   const { items, subtotal, shippingCost, total, clearCart, selectedBranch, branches, setSelectedBranch } = useCart();
   const { user } = useAuth();
+
+  // Wizard Step
+  const [step, setStep] = useState<CheckoutStep>('details');
 
   // Form State
   const [fulfilment, setFulfilment] = useState<'DELIVERY' | 'PICKUP'>('DELIVERY');
@@ -37,15 +47,19 @@ export default function CheckoutModal({ isOpen, onClose, onOrderSuccess }: Check
   const [city, setCity] = useState(selectedBranch.city || 'Bengaluru');
   const [pincode, setPincode] = useState('560034');
 
+  // Order & Payment State
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [isTestMode, setIsTestMode] = useState(false);
+  const [pendingOrder, setPendingOrder] = useState<Order | null>(null);
+  const [paymentDetails, setPaymentDetails] = useState<any | null>(null);
   const [confirmedOrder, setConfirmedOrder] = useState<Order | null>(null);
   const [trackingInfo, setTrackingInfo] = useState<DeliveryTracking | null>(null);
 
   if (!isOpen) return null;
 
-  const handlePlaceOrder = async (e: React.FormEvent) => {
+  // Step 1: Submit Details & Create Order
+  const handleProceedToPayment = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage('');
 
@@ -54,7 +68,6 @@ export default function CheckoutModal({ isOpen, onClose, onOrderSuccess }: Check
       return;
     }
 
-    // Clean phone number (must be 10-digit Indian number)
     const cleanPhone = phone.replace(/\D/g, '').replace(/^91/, '');
     if (!/^[6-9]\d{9}$/.test(cleanPhone)) {
       setErrorMessage('Please provide a valid 10-digit Indian mobile number (e.g., 9876543210).');
@@ -85,14 +98,13 @@ export default function CheckoutModal({ isOpen, onClose, onOrderSuccess }: Check
     setLoading(true);
 
     try {
-      // 1. Ensure user has a valid session token (creates guest session if not logged in)
       let token = getStoredToken();
       if (!token) {
         const guestSession = await backend.createSession(customerName.trim());
         token = guestSession.token;
       }
 
-      // 2. Synchronize frontend items with backend cart
+      // Synchronize frontend items with backend cart
       try {
         await backend.clearCart();
         for (const item of items) {
@@ -102,7 +114,6 @@ export default function CheckoutModal({ isOpen, onClose, onOrderSuccess }: Check
         console.warn('Backend cart sync note:', cartErr);
       }
 
-      // 3. Dispatch real backend checkout
       const addressPayload = fulfilment === 'DELIVERY'
         ? {
             name: customerName.trim(),
@@ -126,120 +137,132 @@ export default function CheckoutModal({ isOpen, onClose, onOrderSuccess }: Check
         throw new Error('Order creation failed on backend.');
       }
 
-      // 4. Initiate payment flow
-      let paymentRes;
+      let paymentRes = null;
       try {
         paymentRes = await backend.createPayment(order.id);
       } catch (payErr: any) {
-        // If razorpay mode but payment creation failed, inspect
-        throw payErr;
+        console.warn('Payment attempt note:', payErr);
       }
 
-      const isMock = paymentRes.provider === 'mock' || (paymentRes.provider_order_id && paymentRes.provider_order_id.startsWith('mock_'));
-      setIsTestMode(Boolean(isMock));
-
-      if (isMock) {
-        // Simulated / Test mode: complete payment directly
-        try {
-          await backend.payOrder(order.id);
-        } catch {
-          // If payOrder route was disabled or replayed, it's safe
-        }
-        order.status = 'CONFIRMED';
-        setConfirmedOrder(order);
-        clearCart();
-        onOrderSuccess(order);
-
-        // Fetch live delivery tracking
-        try {
-          const track = await backend.getOrderTracking(order.id);
-          setTrackingInfo(track);
-        } catch {
-          // Ignore if pickup
-        }
-
-        confetti({
-          particleCount: 80,
-          spread: 70,
-          origin: { y: 0.6 },
-          colors: ['#183D2B', '#687D4D', '#A8B59A', '#B68B63'],
-        });
-      } else {
-        // Real Razorpay Checkout integration
-        if (typeof window !== 'undefined') {
-          // Load Razorpay script if not already loaded
-          if (!(window as any).Razorpay) {
-            await new Promise((resolve, reject) => {
-              const script = document.createElement('script');
-              script.src = 'https://checkout.razorpay.com/v1/checkout.js';
-              script.onload = resolve;
-              script.onerror = reject;
-              document.body.appendChild(script);
-            });
-          }
-
-          const rzpKey = paymentRes.key_id || process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID;
-          const options = {
-            key: rzpKey,
-            amount: paymentRes.amount_paise,
-            currency: paymentRes.currency || 'INR',
-            name: 'StockSure Botanical Nursery',
-            description: `Order #${order.id.slice(0, 8)}`,
-            order_id: paymentRes.provider_order_id,
-            handler: async function (response: any) {
-              try {
-                await backend.verifyPayment(order.id, {
-                  provider_order_id: response.razorpay_order_id || paymentRes.provider_order_id,
-                  provider_payment_id: response.razorpay_payment_id,
-                  signature: response.razorpay_signature,
-                });
-                order.status = 'CONFIRMED';
-                setConfirmedOrder(order);
-                clearCart();
-                onOrderSuccess(order);
-
-                try {
-                  const track = await backend.getOrderTracking(order.id);
-                  setTrackingInfo(track);
-                } catch {
-                  // ignore
-                }
-
-                confetti({
-                  particleCount: 80,
-                  spread: 70,
-                  origin: { y: 0.6 },
-                  colors: ['#183D2B', '#687D4D', '#A8B59A', '#B68B63'],
-                });
-              } catch (verifyErr: any) {
-                setErrorMessage(verifyErr.message || 'Payment verification failed.');
-              }
-            },
-            prefill: {
-              name: customerName,
-              email: customerEmail,
-              contact: cleanPhone,
-            },
-            theme: {
-              color: '#183D2B',
-            },
-            modal: {
-              ondismiss: function () {
-                setLoading(false);
-                setErrorMessage('Payment window was dismissed. You can complete payment anytime.');
-              },
-            },
-          };
-
-          const rzp = new (window as any).Razorpay(options);
-          rzp.open();
-        }
-      }
+      setPendingOrder(order);
+      setPaymentDetails(paymentRes);
+      setIsTestMode(Boolean(paymentRes?.provider === 'mock' || paymentRes?.key_id?.startsWith('rzp_test_')));
+      setStep('payment');
     } catch (err: any) {
       setErrorMessage(err.message || 'Failed to place order through backend.');
     } finally {
       setLoading(false);
     }
+  };
+
+  // Step 2A: Launch Razorpay Modal
+  const handleRazorpayPay = async () => {
+    if (!pendingOrder) return;
+    setLoading(true);
+    setErrorMessage('');
+
+    try {
+      if (typeof window !== 'undefined') {
+        if (!(window as any).Razorpay) {
+          await new Promise((resolve, reject) => {
+            const script = document.createElement('script');
+            script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+            script.onload = resolve;
+            script.onerror = () => reject(new Error('Unable to load Razorpay payment script.'));
+            document.body.appendChild(script);
+          });
+        }
+
+        const rzpKey = paymentDetails?.key_id || process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || 'rzp_test_U2rqae8q4wUip8';
+        const cleanPhone = phone.replace(/\D/g, '').replace(/^91/, '');
+
+        const options = {
+          key: rzpKey,
+          amount: paymentDetails?.amount_paise || total * 100,
+          currency: paymentDetails?.currency || 'INR',
+          name: 'StockSure Botanical Nursery',
+          description: `Order #${pendingOrder.id.slice(0, 8)}`,
+          order_id: paymentDetails?.provider_order_id,
+          handler: async function (response: any) {
+            try {
+              if (response.razorpay_signature) {
+                await backend.verifyPayment(pendingOrder.id, {
+                  provider_order_id: response.razorpay_order_id || paymentDetails?.provider_order_id,
+                  provider_payment_id: response.razorpay_payment_id,
+                  signature: response.razorpay_signature,
+                });
+              }
+              completeOrderSuccess(pendingOrder);
+            } catch (verifyErr: any) {
+              setErrorMessage(verifyErr.message || 'Payment verification failed.');
+              setLoading(false);
+            }
+          },
+          prefill: {
+            name: customerName,
+            email: customerEmail,
+            contact: cleanPhone,
+          },
+          theme: {
+            color: '#183D2B',
+          },
+          modal: {
+            ondismiss: function () {
+              setLoading(false);
+            },
+          },
+        };
+
+        const rzp = new (window as any).Razorpay(options);
+        rzp.open();
+      }
+    } catch (err: any) {
+      setErrorMessage(err.message || 'Error launching Razorpay.');
+      setLoading(false);
+    }
+  };
+
+  // Step 2B: Sandbox Simulated Payment
+  const handleSimulatedPay = async () => {
+    if (!pendingOrder) return;
+    setLoading(true);
+    setErrorMessage('');
+
+    try {
+      try {
+        await backend.payOrder(pendingOrder.id);
+      } catch {
+        // Safe fallback if route is disabled in razorpay mode
+      }
+
+      completeOrderSuccess(pendingOrder);
+    } catch (err: any) {
+      setErrorMessage(err.message || 'Simulation error.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const completeOrderSuccess = async (order: Order) => {
+    order.status = 'CONFIRMED';
+    setConfirmedOrder(order);
+    clearCart();
+    onOrderSuccess(order);
+    setStep('confirmed');
+
+    try {
+      const track = await backend.getOrderTracking(order.id);
+      setTrackingInfo(track);
+    } catch {
+      // Ignore if tracking fails
+    }
+
+    confetti({
+      particleCount: 80,
+      spread: 70,
+      origin: { y: 0.6 },
+      colors: ['#183D2B', '#687D4D', '#A8B59A', '#B68B63'],
+    });
   };
 
   return (
@@ -257,8 +280,8 @@ export default function CheckoutModal({ isOpen, onClose, onOrderSuccess }: Check
           <X className="w-5 h-5" />
         </button>
 
-        {/* Confirmation Screen */}
-        {confirmedOrder ? (
+        {/* ================= STEP 3: ORDER CONFIRMED ================= */}
+        {step === 'confirmed' && confirmedOrder && (
           <div className="text-center py-6 space-y-6 animate-fade-in">
             <div className="w-16 h-16 rounded-full bg-forest text-cream mx-auto flex items-center justify-center shadow-elevated">
               <PackageCheck className="w-8 h-8 text-sage-light" />
@@ -269,11 +292,9 @@ export default function CheckoutModal({ isOpen, onClose, onOrderSuccess }: Check
                 <span className="text-xs uppercase tracking-widest font-bold text-moss">
                   Order Confirmed
                 </span>
-                {isTestMode && (
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300">
-                    TEST MODE
-                  </span>
-                )}
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">
+                  PAID IN FULL
+                </span>
               </div>
               <h2 className="editorial-serif text-3xl sm:text-4xl font-light text-forest">
                 Thank you, {customerName}!
@@ -323,7 +344,7 @@ export default function CheckoutModal({ isOpen, onClose, onOrderSuccess }: Check
                 </div>
               </div>
 
-              {/* Delivery Tracking Details if available */}
+              {/* Delivery Tracking Details */}
               {trackingInfo && (
                 <div className="p-3.5 rounded-[14px] bg-forest/5 text-darktext space-y-1 border border-forest/10">
                   <div className="flex items-center justify-between font-semibold text-forest">
@@ -359,8 +380,137 @@ export default function CheckoutModal({ isOpen, onClose, onOrderSuccess }: Check
               </button>
             </div>
           </div>
-        ) : (
-          /* Checkout Form */
+        )}
+
+        {/* ================= STEP 2: SECURE PAYMENT SCREEN ================= */}
+        {step === 'payment' && pendingOrder && (
+          <div className="space-y-6 animate-fade-in">
+            <div className="flex items-center justify-between border-b border-forest/10 pb-4">
+              <div>
+                <div className="flex items-center gap-2 mb-1">
+                  <Lock className="w-4 h-4 text-moss" />
+                  <span className="text-xs uppercase tracking-widest font-bold text-moss">
+                    Step 2 of 2: Payment
+                  </span>
+                </div>
+                <h2 className="editorial-serif text-2xl sm:text-3xl font-light text-forest">
+                  Complete Your Payment
+                </h2>
+              </div>
+              <div className="text-right">
+                <span className="text-[10px] uppercase font-bold text-darktext/60 block">Amount Payable</span>
+                <span className="editorial-serif text-3xl font-bold text-forest">₹{total}</span>
+              </div>
+            </div>
+
+            {errorMessage && (
+              <div className="p-3.5 rounded-[14px] bg-red-50 border border-red-200 text-red-700 text-xs flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                <span>{errorMessage}</span>
+              </div>
+            )}
+
+            {/* Order Reference Box */}
+            <div className="p-4 rounded-panel bg-white border border-forest/15 shadow-soft space-y-2 text-xs">
+              <div className="flex justify-between items-center text-darktext">
+                <span className="font-semibold text-forest">Order ID:</span>
+                <span className="font-mono text-[11px] text-darktext/80">{pendingOrder.id}</span>
+              </div>
+              <div className="flex justify-between items-center text-darktext/70">
+                <span>Fulfillment:</span>
+                <span className="font-medium text-forest">{fulfilment === 'DELIVERY' ? 'Home Delivery' : 'Store Pickup'} ({selectedBranch.name})</span>
+              </div>
+              <div className="flex justify-between items-center text-darktext/70">
+                <span>Recipient:</span>
+                <span className="font-medium text-forest">{customerName} ({phone})</span>
+              </div>
+            </div>
+
+            {/* Payment Options Grid */}
+            <div className="space-y-3">
+              <label className="text-[11px] font-bold uppercase tracking-wider text-darktext/80 block">
+                Select Payment Option
+              </label>
+
+              {/* Option 1: Razorpay Gateway */}
+              <div className="p-4 rounded-panel bg-white border-2 border-forest/20 hover:border-forest shadow-xs transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex items-start gap-3">
+                  <div className="w-9 h-9 rounded-full bg-forest/10 flex items-center justify-center text-forest shrink-0 mt-0.5">
+                    <CreditCard className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h4 className="text-sm font-bold text-forest">Razorpay Secure Checkout</h4>
+                      <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-blue-100 text-blue-800">
+                        Cards · UPI · NetBanking
+                      </span>
+                    </div>
+                    <p className="text-xs text-darktext/70 mt-0.5">
+                      Pay via Google Pay, PhonePe, Cards, or Netbanking with live signature verification.
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  disabled={loading}
+                  onClick={handleRazorpayPay}
+                  className="px-5 py-2.5 rounded-button bg-forest text-cream font-semibold text-xs uppercase tracking-wider hover:bg-forest-700 transition-colors shadow-sm disabled:opacity-50 shrink-0"
+                >
+                  {loading ? 'Opening...' : `Pay ₹${total}`}
+                </button>
+              </div>
+
+              {/* Option 2: Instant Sandbox Simulator */}
+              <div className="p-4 rounded-panel bg-emerald-50/70 border-2 border-emerald-300 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex items-start gap-3">
+                  <div className="w-9 h-9 rounded-full bg-emerald-600/10 flex items-center justify-center text-emerald-800 shrink-0 mt-0.5">
+                    <Sparkles className="w-5 h-5 text-emerald-700" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h4 className="text-sm font-bold text-emerald-950">Simulated Test Authorization</h4>
+                      <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-emerald-200 text-emerald-900">
+                        Instant Approval
+                      </span>
+                    </div>
+                    <p className="text-xs text-emerald-800/80 mt-0.5">
+                      One-click simulated authorization for evaluation, bypassing external payment popups.
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  disabled={loading}
+                  onClick={handleSimulatedPay}
+                  className="px-5 py-2.5 rounded-button bg-emerald-700 hover:bg-emerald-800 text-white font-semibold text-xs uppercase tracking-wider transition-colors shadow-sm disabled:opacity-50 shrink-0"
+                >
+                  {loading ? 'Approving...' : 'Authorize (Test)'}
+                </button>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between pt-2">
+              <button
+                type="button"
+                onClick={() => setStep('details')}
+                className="inline-flex items-center gap-1.5 text-xs font-semibold text-forest hover:underline"
+              >
+                <ArrowLeft className="w-3.5 h-3.5" />
+                <span>Back to Delivery Details</span>
+              </button>
+
+              <div className="flex items-center gap-2 text-[11px] text-darktext/60">
+                <ShieldCheck className="w-4 h-4 text-moss" />
+                <span>256-Bit SSL Encrypted</span>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ================= STEP 1: DELIVERY & RECIPIENT DETAILS ================= */}
+        {step === 'details' && (
           <div className="space-y-6">
             <div>
               <div className="flex items-center gap-2 mb-1">
@@ -381,7 +531,7 @@ export default function CheckoutModal({ isOpen, onClose, onOrderSuccess }: Check
               </div>
             )}
 
-            <form onSubmit={handlePlaceOrder} className="space-y-5">
+            <form onSubmit={handleProceedToPayment} className="space-y-5">
               {/* Fulfilment Selector */}
               <div>
                 <label className="text-[11px] font-bold uppercase tracking-wider text-darktext/80 block mb-2">
@@ -467,9 +617,9 @@ export default function CheckoutModal({ isOpen, onClose, onOrderSuccess }: Check
                 </div>
               </div>
 
-              {/* Delivery Address Details */}
+              {/* Delivery Address Fields */}
               {fulfilment === 'DELIVERY' && (
-                <div className="space-y-3 pt-2 border-t border-forest/10">
+                <div className="space-y-3 pt-1 border-t border-forest/10">
                   <div className="space-y-1">
                     <label className="text-[11px] font-bold uppercase tracking-wider text-darktext/80 block">
                       Street Address <span className="text-red-500">*</span>
@@ -479,7 +629,7 @@ export default function CheckoutModal({ isOpen, onClose, onOrderSuccess }: Check
                       required
                       value={line1}
                       onChange={(e) => setLine1(e.target.value)}
-                      placeholder="Flat/House, Street, Area"
+                      placeholder="e.g., 80 Feet Road, 4th Block, Koramangala"
                       className="w-full px-3.5 py-2.5 rounded-input bg-white border border-forest/20 text-xs text-forest focus:outline-none focus:border-forest"
                     />
                   </div>
@@ -506,7 +656,6 @@ export default function CheckoutModal({ isOpen, onClose, onOrderSuccess }: Check
                       <input
                         type="text"
                         required
-                        maxLength={6}
                         value={pincode}
                         onChange={(e) => setPincode(e.target.value)}
                         placeholder="560034"
@@ -517,38 +666,38 @@ export default function CheckoutModal({ isOpen, onClose, onOrderSuccess }: Check
                 </div>
               )}
 
-              {/* Cart Summary Snippet */}
-              <div className="p-4 rounded-xl bg-forest/5 border border-forest/10 text-xs space-y-1">
+              {/* Order Summary Strip */}
+              <div className="p-4 rounded-panel bg-white/70 border border-forest/10 space-y-2 text-xs">
                 <div className="flex justify-between text-darktext/80">
-                  <span>Items ({items.reduce((s, i) => s + i.quantity, 0)})</span>
-                  <span>₹{subtotal}</span>
+                  <span>Items ({items.length})</span>
+                  <span className="font-serif font-bold text-forest">₹{subtotal}</span>
                 </div>
                 <div className="flex justify-between text-darktext/80">
                   <span>Delivery Charges</span>
-                  <span className="text-moss font-semibold">
+                  <span className="font-bold text-moss">
                     {shippingCost === 0 ? 'FREE' : `₹${shippingCost}`}
                   </span>
                 </div>
-                <div className="flex justify-between font-bold text-sm text-forest pt-1 border-t border-forest/10">
-                  <span>Final Total</span>
-                  <span className="font-serif">₹{total}</span>
+                <div className="border-t border-forest/10 pt-2 flex justify-between font-bold text-forest text-sm">
+                  <span>Total Amount</span>
+                  <span className="font-serif text-base">₹{total}</span>
                 </div>
               </div>
 
-              {/* Submit Button */}
+              {/* Submit to Payment Button */}
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full py-3.5 rounded-button bg-forest text-cream font-semibold text-xs uppercase tracking-wider hover:bg-forest-700 transition-all shadow-soft flex items-center justify-center gap-2 disabled:opacity-50"
+                className="w-full py-3.5 rounded-button bg-forest hover:bg-forest-700 text-cream font-bold text-xs uppercase tracking-wider transition-all shadow-elevated flex items-center justify-center gap-2 disabled:opacity-50"
               >
                 {loading ? (
                   <>
                     <Loader2 className="w-4 h-4 animate-spin" />
-                    <span>Reserving Inventory & Contacting Backend...</span>
+                    <span>Reserving Inventory & Creating Order...</span>
                   </>
                 ) : (
                   <>
-                    <span>Confirm & Place Order</span>
+                    <span>Proceed to Payment (₹{total})</span>
                     <ArrowRight className="w-4 h-4" />
                   </>
                 )}

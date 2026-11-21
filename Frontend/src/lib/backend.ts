@@ -192,24 +192,37 @@ export function clearStoredSession(): void {
   localStorage.removeItem(CUSTOMER_ID_KEY);
 }
 
-export function formatImageUrl(url?: string | null): string {
-  if (!url || typeof url !== 'string' || !url.trim()) {
-    return '/products/snake-plant.jpg';
-  }
-  const clean = url.trim();
-  if (clean.startsWith('http://') || clean.startsWith('https://')) {
-    return clean;
-  }
-  if (clean.startsWith('/static/plants/')) {
-    return `/backend${clean}`;
-  }
-  if (clean.startsWith('static/plants/')) {
+export function formatImageUrl(url?: string | null, plantName?: string): string {
+  if (url && typeof url === 'string' && url.trim()) {
+    const clean = url.trim();
+    if (clean.startsWith('http://') || clean.startsWith('https://')) {
+      return clean;
+    }
+    if (clean.startsWith('/static/plants/')) {
+      return `/backend${clean}`;
+    }
+    if (clean.startsWith('static/plants/')) {
+      return `/backend/${clean}`;
+    }
+    if (clean.startsWith('/')) {
+      return clean;
+    }
     return `/backend/${clean}`;
   }
-  if (clean.startsWith('/')) {
-    return clean;
+
+  if (plantName && typeof plantName === 'string') {
+    const slug = plantName
+      .split(',')[0]
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '');
+    if (slug) {
+      return `/backend/static/plants/${slug}.jpg`;
+    }
   }
-  return `/backend/${clean}`;
+
+  return '/products/money-plant.jpg';
 }
 
 export function adaptProduct(bp: BackendProduct): Product {
@@ -244,7 +257,7 @@ export function adaptProduct(bp: BackendProduct): Product {
       : 'When top 2 inches dry',
     petFriendly: !bp.tags?.includes('toxic'),
     difficulty: 'Easy',
-    imageUrl: formatImageUrl(bp.image_url),
+    imageUrl: formatImageUrl(bp.image_url, bp.name),
     bestseller: bp.id % 3 === 0,
     newArrival: bp.id % 2 === 0,
     branches: bp.branches,
