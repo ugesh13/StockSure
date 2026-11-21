@@ -43,6 +43,9 @@ export function getPool(): pg.Pool {
     ssl: sslOption(),
   });
   pool.on('error', (e) => log('error', 'idle pg client error', { error: e.message }));
+  pool.on('connect', (client) => {
+    client.on('error', (err) => log('warn', 'pg client error', { error: err.message }));
+  });
   return pool;
 }
 
