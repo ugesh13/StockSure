@@ -12,3 +12,6 @@ reports/
 logs/
 .DS_Store
 _parked_not_for_git/
+*.dmg
+test-results/
+
