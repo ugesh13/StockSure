@@ -36,6 +36,9 @@ npm run pos-sim
 
 Only variable names are listed. Values must be provided in `.env` (never committed):
 
+- `NODE_ENV`: Environment (`development`, `test`, `production`)
+- `PORT`: HTTP server port (default `3000`)
+- `CORS_ORIGINS`: Comma-separated allowed CORS origins (default `http://localhost:5173`)
 - `DATABASE_URL`: PostgreSQL connection string
 - `PG_SSL`: SSL mode (`require` or `off`)
 - `PG_CA_B64`: Base64 encoded CA certificate for PostgreSQL (optional if system trust applies)
@@ -47,13 +50,29 @@ Only variable names are listed. Values must be provided in `.env` (never committ
 - `KAFKA_SASL_USERNAME`: Kafka SASL username (SASL auth)
 - `KAFKA_SASL_PASSWORD`: Kafka SASL password (SASL auth)
 - `KAFKA_SASL_MECHANISM`: SASL mechanism (`scram-sha-256`, `scram-sha-512`, or `plain`)
+- `KAFKA_PARTITIONS`: Number of topic partitions (default `2`)
+- `KAFKA_CLIENT_ID`: Kafka client identifier (default `stocksure`)
 - `OPENSEARCH_URL`: OpenSearch cluster URL including credentials
 - `OPENSEARCH_INDEX`: Search index name (default `products_v1`)
 - `STAFF_KEY` / `STAFF_API_KEY`: Secret key for staff endpoints
 - `ADMIN_TOKEN`: Secret token for admin endpoints
-- `CORS_ORIGINS`: Comma-separated allowed CORS origins (default `http://localhost:5173`)
+- `HOLD_MINUTES`: Cart reservation hold duration in minutes (default `10`)
+- `LOW_STOCK`: Threshold for low stock warning (default `3`)
+- `STALE_SECONDS`: Heartbeat freshness threshold in seconds (default `60`)
+- `RELAY_INTERVAL_MS`: Outbox relay poll interval in ms (default `400`)
+- `SWEEP_INTERVAL_MS`: Cart sweeper interval in ms (default `30000`)
+- `SEARCH_TIMEOUT_MS`: OpenSearch query timeout in ms (default `1500`)
+- `RUN_RELAY`: Run outbox relay in API process (`true` or `false`)
+- `RUN_SWEEPER`: Run cart sweeper in API process (`true` or `false`)
+- `DEMO_MODE`: Enable demo shoppers and demo endpoints (`true` or `false`, default `false` in production)
 - `DOCS_ENABLED`: Expose Swagger UI at `/docs` in production when set to `true` (default `false` in production, enabled in development)
 - `ALLOW_DESTRUCTIVE`: Set to `1` to authorize destructive operations like `npm run seed -- --reset`
+- `ZOHO_CLIENT_ID`: Zoho OAuth client ID
+- `ZOHO_CLIENT_SECRET`: Zoho OAuth client secret
+- `ZOHO_REFRESH_TOKEN`: Zoho OAuth refresh token
+- `ZOHO_ORG_ID`: Zoho inventory organization ID
+- `ZOHO_ACCOUNTS_URL`: Zoho accounts auth URL (default `https://accounts.zoho.in`)
+- `ZOHO_API_URL`: Zoho Inventory API base URL (default `https://www.zohoapis.in/inventory/v1`)
 
 ## Why every branch shows CONFIRM_WITH_STORE
 
@@ -67,7 +86,7 @@ When a branch's last heartbeat is older than 60 seconds (or has never checked in
 |---|---|
 | `npm test` | Pure rules: availability, status, freshness, split plan, search body, event schemas, config errors, catalogue validation, session token hashing, cart codes, `since` filtering, kiosk branch matching. |
 | `npm run typecheck` | Strict TypeScript verification across all source and test files (`tsc --noEmit`). |
-| `npm run contract:check` | Verifies all 8 frontend contract endpoints against running server with Zod schemas. |
+| `npm run contract:check` | API contract check: verifies all 8 API endpoints against running server with Zod schemas. |
 | `npm run race-test` | T1 and T2 over HTTP against the running API (guarded reserve and concurrent holds). |
 | `npm run kafka:probe` | Diagnostics probe for Kafka connectivity and connection queue timing. |
 | `npm run warmup` | Before demo: wakes all three services and waits until healthy. |

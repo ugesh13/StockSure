@@ -59,12 +59,15 @@ export async function buildApp(): Promise<FastifyInstance> {
     bodyLimit: 100_000,
   });
 
-  const corsOrigins = (process.env.CORS_ORIGINS || c.CORS_ORIGINS || c.CORS_ORIGIN || 'http://localhost:5173,http://127.0.0.1:5173')
+  const configuredOrigins = (process.env.CORS_ORIGINS || c.CORS_ORIGINS || c.CORS_ORIGIN || 'http://localhost:5173,http://127.0.0.1:5173')
     .split(',')
     .map((o) => o.trim())
     .filter(Boolean);
-  if (!corsOrigins.includes('http://127.0.0.1:5173')) corsOrigins.push('http://127.0.0.1:5173');
-  if (!corsOrigins.includes('http://localhost:5173')) corsOrigins.push('http://localhost:5173');
+  const corsOrigins = [...configuredOrigins];
+  if (c.NODE_ENV !== 'production') {
+    if (!corsOrigins.includes('http://127.0.0.1:5173')) corsOrigins.push('http://127.0.0.1:5173');
+    if (!corsOrigins.includes('http://localhost:5173')) corsOrigins.push('http://localhost:5173');
+  }
 
   await app.register(cors, {
     origin: corsOrigins,

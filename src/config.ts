@@ -57,6 +57,7 @@ const Schema = z.object({
   RUN_SWEEPER: flag(true),
   DEMO_MODE: flag(false),
   DOCS_ENABLED: flag(false),
+  ALLOW_DESTRUCTIVE: flag(false),
 
   ZOHO_CLIENT_ID: str(),
   ZOHO_CLIENT_SECRET: str(),
@@ -87,6 +88,10 @@ export function loadConfig(groups: Group[], defaults: Record<string, string> = {
   }
   if (process.env.STAFF_API_KEY && !env.STAFF_KEY) {
     env.STAFF_KEY = process.env.STAFF_API_KEY;
+  }
+  if (process.env.CORS_ORIGIN && !process.env.CORS_ORIGINS) {
+    console.warn('[WARN] CORS_ORIGIN is deprecated. Use CORS_ORIGINS instead.');
+    env.CORS_ORIGINS = process.env.CORS_ORIGIN;
   }
 
   const parsed = Schema.safeParse(env);
