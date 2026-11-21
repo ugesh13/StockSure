@@ -169,21 +169,23 @@ export default function DynamicIslandNavbar() {
           <div className="hidden md:flex items-center gap-2 flex-shrink-0">
             <span className="h-4 w-[1px] bg-white/20 mr-1" aria-hidden="true" />
 
-            {/* Shopping Cart Button */}
-            <button
-              type="button"
-              onClick={() => setIsCartOpen(true)}
-              aria-label={`Cart with ${cartCount} items`}
-              className="relative p-2 rounded-full transition-all duration-300 text-white/90 hover:text-white hover:bg-white/10 flex items-center justify-center"
-              title="Shopping Cart"
-            >
-              <ShoppingBag className="w-4 h-4" />
-              {cartCount > 0 && (
-                <span className="absolute -top-1 -right-1 bg-moss text-cream text-[10px] font-bold px-1.5 py-0.2 rounded-full border border-[#121E17] shadow-xs">
-                  {cartCount}
-                </span>
-              )}
-            </button>
+            {/* Shopping Cart Button: Only visible when user is successfully signed in */}
+            {user && !user.is_guest && (
+              <button
+                type="button"
+                onClick={() => setIsCartOpen(true)}
+                aria-label={`Cart with ${cartCount} items`}
+                className="relative p-2 rounded-full transition-all duration-300 text-white/90 hover:text-white hover:bg-white/10 flex items-center justify-center"
+                title="Shopping Cart"
+              >
+                <ShoppingBag className="w-4 h-4" />
+                {cartCount > 0 && (
+                  <span className="absolute -top-1 -right-1 bg-moss text-cream text-[10px] font-bold px-1.5 py-0.2 rounded-full border border-[#121E17] shadow-xs">
+                    {cartCount}
+                  </span>
+                )}
+              </button>
+            )}
 
             {/* Clear, Legible Authentication / Profile Button */}
             {user ? (
@@ -198,32 +200,33 @@ export default function DynamicIslandNavbar() {
                 <span>Hi, {user.name ? user.name.split(' ')[0] : 'Shopper'}</span>
               </Link>
             ) : (
-              <button
-                type="button"
-                onClick={() => openAuthModal('login')}
+              <Link
+                href="/login"
                 className="flex items-center gap-1.5 py-1.5 px-4 rounded-full bg-moss hover:bg-moss-700 text-white text-xs font-bold transition-all duration-300 shadow-xs border border-white/10"
               >
                 <User className="w-3.5 h-3.5 text-white" />
                 <span>Sign In / Register</span>
-              </button>
+              </Link>
             )}
           </div>
 
           {/* Mobile Right Controls: Cart, Profile & Menu Toggle */}
           <div className="flex items-center gap-1.5 md:hidden">
-            <button
-              type="button"
-              onClick={() => setIsCartOpen(true)}
-              aria-label="Shopping Cart"
-              className="relative p-2 rounded-full text-white/90 hover:text-white"
-            >
-              <ShoppingBag className="w-4 h-4" />
-              {cartCount > 0 && (
-                <span className="absolute -top-0.5 -right-0.5 bg-moss text-cream text-[9px] font-bold px-1 rounded-full">
-                  {cartCount}
-                </span>
-              )}
-            </button>
+            {user && !user.is_guest && (
+              <button
+                type="button"
+                onClick={() => setIsCartOpen(true)}
+                aria-label="Shopping Cart"
+                className="relative p-2 rounded-full text-white/90 hover:text-white"
+              >
+                <ShoppingBag className="w-4 h-4" />
+                {cartCount > 0 && (
+                  <span className="absolute -top-0.5 -right-0.5 bg-moss text-cream text-[9px] font-bold px-1 rounded-full">
+                    {cartCount}
+                  </span>
+                )}
+              </button>
+            )}
 
             {user ? (
               <Link
@@ -236,13 +239,12 @@ export default function DynamicIslandNavbar() {
                 </div>
               </Link>
             ) : (
-              <button
-                type="button"
-                onClick={() => openAuthModal('login')}
+              <Link
+                href="/login"
                 className="px-2.5 py-1 rounded-full bg-moss text-white text-[11px] font-bold"
               >
                 Sign In
-              </button>
+              </Link>
             )}
 
             <button
@@ -290,22 +292,24 @@ export default function DynamicIslandNavbar() {
                 Contact Us
               </a>
 
-              <button
-                type="button"
-                onClick={() => {
-                  setMobileMenuOpen(false);
-                  setIsCartOpen(true);
-                }}
-                className="w-full text-left py-2 px-3 rounded-[14px] transition-colors text-white/90 hover:bg-white/10 flex items-center justify-between"
-              >
-                <span className="flex items-center gap-2">
-                  <ShoppingBag className="w-4 h-4 text-moss" />
-                  <span>Shopping Basket</span>
-                </span>
-                <span className="px-2 py-0.5 rounded-full bg-moss text-xs font-bold text-white">
-                  {cartCount} items
-                </span>
-              </button>
+              {user && !user.is_guest && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMobileMenuOpen(false);
+                    setIsCartOpen(true);
+                  }}
+                  className="w-full text-left py-2 px-3 rounded-[14px] transition-colors text-white/90 hover:bg-white/10 flex items-center justify-between"
+                >
+                  <span className="flex items-center gap-2">
+                    <ShoppingBag className="w-4 h-4 text-moss" />
+                    <span>Shopping Basket</span>
+                  </span>
+                  <span className="px-2 py-0.5 rounded-full bg-moss text-xs font-bold text-white">
+                    {cartCount} items
+                  </span>
+                </button>
+              )}
 
               {user ? (
                 <Link
@@ -317,17 +321,14 @@ export default function DynamicIslandNavbar() {
                   <span className="text-xs text-moss">{user.name}</span>
                 </Link>
               ) : (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setMobileMenuOpen(false);
-                    openAuthModal('login');
-                  }}
+                <Link
+                  href="/login"
+                  onClick={() => setMobileMenuOpen(false)}
                   className="w-full text-left py-2 px-3 rounded-[14px] transition-colors bg-moss text-white font-bold flex items-center gap-2"
                 >
                   <User className="w-4 h-4" />
                   <span>Sign In / Register</span>
-                </button>
+                </Link>
               )}
             </nav>
           </div>

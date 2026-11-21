@@ -69,11 +69,7 @@ function AnimatedLetter({
   s5,
   setRef,
 }: LetterItemProps) {
-  if (config.isSpace) {
-    return <span className="inline-block w-3 sm:w-5">&nbsp;</span>;
-  }
-
-  const { driftMax, fallMax, rotMax, delayRatio } = config;
+  const { driftMax, fallMax, rotMax, delayRatio, isSpace } = config;
 
   // Staggered start timing per letter
   const startP = s0 + (s1 - s0) * (0.20 + delayRatio * 0.80);
@@ -125,6 +121,10 @@ function AnimatedLetter({
   const y = useSpring(yRaw, springSettings);
   const rotate = useSpring(rotateRaw, springSettings);
   const scale = useSpring(scaleRaw, springSettings);
+
+  if (isSpace) {
+    return <span className="inline-block w-3 sm:w-5">&nbsp;</span>;
+  }
 
   return (
     <motion.span

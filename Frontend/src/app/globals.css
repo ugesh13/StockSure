@@ -7,6 +7,9 @@
 :root {
   --background: #F4F0E6;
   --foreground: #292722;
+  --gate-edge: #7d6346;
+  --gate-mid: #666c38;
+  --gate-avg: #6c5d3b;
 }
 
 body {
