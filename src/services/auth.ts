@@ -270,7 +270,8 @@ export async function getCustomerMe(customerId: number): Promise<MeResponse> {
     name: row.name,
     email: row.email,
     phone: row.phone,
-    is_guest: !row.password_hash && !row.email,
+    // Guest sessions get a placeholder email (guest_<hex>@stocksure.local), so "has an email" does not mean "registered".
+    is_guest: !row.password_hash,
   };
 }
 
@@ -321,8 +322,11 @@ export async function resetPassword(token: string, newPassword: string): Promise
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-    // Mark token used
-    await client.query('UPDATE password_reset_tokens SET used_at = now() WHERE id = $1', [row.id]);
+    // Mark token used. The used_at guard makes two concurrent resets with the same token impossible.
+    const claimed = await client.query('UPDATE password_reset_tokens SET used_at = now() WHERE id = $1 AND used_at IS NULL', [row.id]);
+    if ((claimed.rowCount ?? 0) === 0) {
+      throw new AppError(400, 'INVALID_TOKEN', 'Password reset token is invalid or has expired');
+    }
 
     // Update password
     await client.query('UPDATE customers SET password_hash = $1 WHERE id = $2', [hashedPassword, row.customer_id]);

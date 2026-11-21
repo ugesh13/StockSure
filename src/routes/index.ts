@@ -135,7 +135,9 @@ export function registerRoutes(app: FastifyInstance): void {
     },
     async (req) => {
       const token = req.headers['x-session-token'];
-      if (!token || typeof token !== 'string' || !token.trim()) {
+      const bearer = req.headers.authorization;
+      const hasToken = (typeof token === 'string' && token.trim()) || (typeof bearer === 'string' && bearer.startsWith('Bearer ') && bearer.slice(7).trim());
+      if (!hasToken) {
         throw new AppError(401, 'SESSION_REQUIRED', 'Session token is required to delete account.');
       }
       const customerId = await customerOf(req);
@@ -232,7 +234,9 @@ export function registerRoutes(app: FastifyInstance): void {
         throw new AppError(422, 'MISSING_ADDRESS', 'Delivery address is required when fulfilment is DELIVERY');
       }
       validatedAddress = validateDeliveryAddress(body.address);
-      quote = await getDeliveryQuote(validatedAddress.lat, validatedAddress.lng);
+      // Quote against the cart subtotal so the free-delivery threshold actually applies.
+      const subtotal = (await getCart(customerId)).total_paise;
+      quote = await getDeliveryQuote(validatedAddress.lat, validatedAddress.lng, subtotal);
       if (!quote.serviceable) {
         throw new AppError(400, 'OUT_OF_SERVICE_AREA', quote.reason || 'Address is outside our delivery radius');
       }
@@ -241,17 +245,16 @@ export function registerRoutes(app: FastifyInstance): void {
       }
     }
 
-    const result = await checkout(customerId, idempotencyKeyOf(req), body.fulfilment, body.branch_id);
-
-    if (result.ok && result.order && body.fulfilment === 'DELIVERY' && validatedAddress && quote && !result.replay) {
-      await createDeliveryRecord(
-        result.order.id,
-        body.branch_id || quote.branch_id,
-        validatedAddress,
-        quote.distance_km || 0,
-        quote.fee_paise || 0
-      );
-    }
+    const isDelivery = body.fulfilment === 'DELIVERY' && validatedAddress && quote;
+    const result = await checkout(customerId, idempotencyKeyOf(req), body.fulfilment, body.branch_id, isDelivery
+      ? {
+          // The fee is part of what the shopper pays, and the delivery row is written in the same transaction as the order.
+          extraPaise: quote.fee_paise || 0,
+          afterReserve: async (c, orderId) => {
+            await createDeliveryRecord(orderId, body.branch_id || quote.branch_id, validatedAddress, quote.distance_km || 0, quote.fee_paise || 0, c);
+          },
+        }
+      : {});
 
     return respondCheckout(reply, result, shopperCityOf(req));
   });

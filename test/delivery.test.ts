@@ -121,9 +121,12 @@ test('P1-DEL 3: creates delivery, tracks lifecycle, hides handover code until OU
     const delivered = await updateDeliveryStatus(orderId, 'DELIVERED', 'Delivered to door', handover_code);
     assert.equal(delivered.status, 'DELIVERED');
 
-    // Order status finalized
+    // Delivery is recorded as DELIVERED. orders.finalized_at belongs to the inventory-finalizer (stock deduction),
+    // so a delivery update must NOT set it, or the finalizer would skip the order and leave its stock reserved.
+    const finalTrack = await getOrderTracking(orderId, 1);
+    assert.equal(finalTrack.status, 'DELIVERED');
     const finalOrder = (await pool.query(`SELECT finalized_at FROM orders WHERE id = $1`, [orderId])).rows[0];
-    assert.ok(finalOrder.finalized_at);
+    assert.equal(finalOrder.finalized_at, null);
   } finally {
     // Cleanup order and delivery
     await pool.query(`DELETE FROM order_issues WHERE order_id = $1`, [orderId]);

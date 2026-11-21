@@ -74,6 +74,7 @@ export async function buildApp(): Promise<FastifyInstance> {
     methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: [
       'content-type',
+      'authorization',
       'idempotency-key',
       'x-customer-id',
       'x-session-token',
@@ -86,7 +87,9 @@ export async function buildApp(): Promise<FastifyInstance> {
 
   // Allow an empty body with Content-Type: application/json (POST /pay, POST /cancel, DELETE ...). The built-in
   // parser rejects it with 400. Every body still goes through Zod, which builds fresh objects from it.
-  app.addContentTypeParser('application/json', { parseAs: 'string' }, (_req, body, done) => {
+  app.addContentTypeParser('application/json', { parseAs: 'string' }, (req, body, done) => {
+    // Keep the exact bytes for routes that verify an HMAC over the body (payment webhooks).
+    if (req.url.startsWith('/webhooks/')) (req as unknown as { rawBody?: string }).rawBody = String(body);
     try {
       done(null, parseJsonBody(String(body)));
     } catch (e) {

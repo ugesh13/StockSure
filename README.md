@@ -31,7 +31,7 @@ The API guarantees zero overselling by executing atomic guarded reserve transact
 Run these commands in order:
 
 ```bash
-# 1. Apply database migrations (001, 002, 003)
+# 1. Apply database migrations (001 to 005 in sql/)
 npm run migrate
 
 # 2. Set up Kafka topics (orders, inventory, dlq)

@@ -84,7 +84,7 @@ No shortcuts taken; verified by git log.
 
 ## 8. Actual Execution Results: V4 (Race Test) & V5 (DB Integration Test)
 
-### V4: Race Test (`npm run race-test`)
+![alt text](image.png)### V4: Race Test (`npm run race-test`)
 **Result:** **FAIL: NOT RUN**
 **Reason:** The concurrent-reserve race test (`t1`) requires product 1 at branch 1 to have exactly 1 unit available. On the live Aiven database, product 1 currently shows 48 units available. R0 strictly forbids running destructive database resets (`seed --reset`). Therefore, T1 skipped and the script failed.
 

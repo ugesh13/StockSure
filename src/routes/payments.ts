@@ -60,8 +60,11 @@ export async function paymentRoutes(app: FastifyInstance): Promise<void> {
       throw new AppError(400, 'MISSING_WEBHOOK_SIGNATURE', 'Missing x-razorpay-signature header');
     }
 
-    const rawBody = typeof req.body === 'string' ? req.body : JSON.stringify(req.body || {});
-    const result = await paymentsService.handleWebhook(rawBody, signature);
+    // The HMAC is over the exact bytes Razorpay sent. Re-serialising the parsed body would change them.
+    const raw = (req as FastifyRequest & { rawBody?: string }).rawBody;
+    const rawBody = raw ?? (typeof req.body === 'string' ? req.body : JSON.stringify(req.body || {}));
+    const eventId = req.headers['x-razorpay-event-id'];
+    const result = await paymentsService.handleWebhook(rawBody, signature, typeof eventId === 'string' ? eventId : undefined);
     return reply.status(200).send(result);
   });
 }

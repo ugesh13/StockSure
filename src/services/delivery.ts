@@ -1,5 +1,6 @@
 import crypto from 'node:crypto';
-import { getPool } from '../db.ts';
+import { getPool, withTx } from '../db.ts';
+import type { Db } from '../db.ts';
 import { cfg } from '../config.ts';
 import { AppError } from '../errors.ts';
 import { findNearestBranches, haversineDistanceKm } from './maps.ts';
@@ -141,12 +142,13 @@ export async function createDeliveryRecord(
   branchId: number,
   address: DeliveryAddress,
   distanceKm: number,
-  feePaise: number
+  feePaise: number,
+  db: Db = getPool(),
 ): Promise<{ handover_code: string }> {
-  const pool = getPool();
+  const pool = db;
 
   // Generate 4-digit numeric handover verification code
-  const handoverCode = String(Math.floor(1000 + Math.random() * 9000));
+  const handoverCode = String(crypto.randomInt(1000, 10000));
   const handoverHash = crypto.createHash('sha256').update(handoverCode).digest('hex');
 
   const etaAt = new Date(Date.now() + 45 * 60 * 1000);
@@ -178,10 +180,7 @@ export async function getOrderTracking(orderId: string, customerId: number): Pro
   );
 
   if (orderRes.rows.length === 0 || orderRes.rows[0].customer_id !== customerId) {
-    const err = new Error('Order not found');
-    (err as any).status = 404;
-    (err as any).code = 'ORDER_NOT_FOUND';
-    throw err;
+    throw new AppError(404, 'ORDER_NOT_FOUND', 'Order not found');
   }
 
   const dRes = await pool.query(
@@ -193,10 +192,7 @@ export async function getOrderTracking(orderId: string, customerId: number): Pro
   );
 
   if (dRes.rows.length === 0) {
-    const err = new Error('No delivery record found for this order');
-    (err as any).status = 404;
-    (err as any).code = 'DELIVERY_NOT_FOUND';
-    throw err;
+    throw new AppError(404, 'DELIVERY_NOT_FOUND', 'No delivery record found for this order');
   }
 
   const del = dRes.rows[0];
@@ -283,72 +279,54 @@ export async function updateDeliveryStatus(
   note?: string,
   handoverCode?: string
 ): Promise<{ updated: boolean; status: string }> {
-  const pool = getPool();
-
-  const dRes = await pool.query(
-    `SELECT id, status, handover_code_hash FROM deliveries WHERE order_id = $1`,
-    [orderId]
-  );
-
-  if (dRes.rows.length === 0) {
-    const err = new Error('Delivery not found');
-    (err as any).status = 404;
-    (err as any).code = 'DELIVERY_NOT_FOUND';
-    throw err;
-  }
-
-  const delivery = dRes.rows[0];
-  const allowed = ALLOWED_DELIVERY_TRANSITIONS[delivery.status] || [];
-
-  if (!allowed.includes(newStatus)) {
-    const err = new Error(
-      `Cannot transition delivery from ${delivery.status} to ${newStatus}. Allowed: ${allowed.join(', ') || 'none'}`
-    );
-    (err as any).status = 400;
-    (err as any).code = 'INVALID_STATUS_TRANSITION';
-    throw err;
-  }
-
-  // Handover code check on delivery
-  if (newStatus === 'DELIVERED') {
-    if (!handoverCode) {
-      const err = new Error('4-digit handover verification code is required to complete delivery');
-      (err as any).status = 400;
-      (err as any).code = 'MISSING_HANDOVER_CODE';
-      throw err;
-    }
-
-    const providedHash = crypto.createHash('sha256').update(handoverCode.trim()).digest('hex');
-    if (
-      !delivery.handover_code_hash ||
-      providedHash.length !== delivery.handover_code_hash.length ||
-      !crypto.timingSafeEqual(Buffer.from(providedHash), Buffer.from(delivery.handover_code_hash))
-    ) {
-      const err = new Error('Invalid 4-digit handover verification code');
-      (err as any).status = 400;
-      (err as any).code = 'INVALID_HANDOVER_CODE';
-      throw err;
-    }
-  }
-
-  await pool.query(
-    `UPDATE deliveries SET status = $1 WHERE id = $2`,
-    [newStatus, delivery.id]
-  );
-
-  await pool.query(
-    `INSERT INTO delivery_events (delivery_id, status, note) VALUES ($1, $2, $3)`,
-    [delivery.id, newStatus, note || null]
-  );
-
-  if (newStatus === 'DELIVERED') {
-    await pool.query(
-      `UPDATE orders SET finalized_at = now() WHERE id = $1`,
+  // One transaction with the delivery row locked: two staff devices cannot both apply a transition.
+  return withTx(async (c) => {
+    const dRes = await c.query<{ id: number; status: string; handover_code_hash: string | null; order_status: string }>(
+      `SELECT d.id, d.status, d.handover_code_hash, o.status AS order_status
+         FROM deliveries d JOIN orders o ON o.id = d.order_id
+        WHERE d.order_id = $1
+        FOR UPDATE OF d`,
       [orderId]
     );
-  }
 
-  return { updated: true, status: newStatus };
+    const delivery = dRes.rows[0];
+    if (!delivery) {
+      throw new AppError(404, 'DELIVERY_NOT_FOUND', 'Delivery not found');
+    }
+
+    const allowed = ALLOWED_DELIVERY_TRANSITIONS[delivery.status] || [];
+    if (!allowed.includes(newStatus)) {
+      throw new AppError(400, 'INVALID_STATUS_TRANSITION', `Cannot transition delivery from ${delivery.status} to ${newStatus}. Allowed: ${allowed.join(', ') || 'none'}`);
+    }
+
+    // Nothing ships before the shopper has paid.
+    if (newStatus !== 'CANCELLED' && delivery.order_status !== 'PLACED') {
+      throw new AppError(409, 'ORDER_NOT_PAID', `Order is ${delivery.order_status}; only a paid (PLACED) order can be dispatched.`);
+    }
+
+    // Handover code check on delivery
+    if (newStatus === 'DELIVERED') {
+      if (!handoverCode) {
+        throw new AppError(400, 'MISSING_HANDOVER_CODE', '4-digit handover verification code is required to complete delivery');
+      }
+
+      const providedHash = crypto.createHash('sha256').update(handoverCode.trim()).digest('hex');
+      if (
+        !delivery.handover_code_hash ||
+        providedHash.length !== delivery.handover_code_hash.length ||
+        !crypto.timingSafeEqual(Buffer.from(providedHash), Buffer.from(delivery.handover_code_hash))
+      ) {
+        throw new AppError(400, 'INVALID_HANDOVER_CODE', 'Invalid 4-digit handover verification code');
+      }
+    }
+
+    await c.query(`UPDATE deliveries SET status = $1 WHERE id = $2`, [newStatus, delivery.id]);
+    await c.query(`INSERT INTO delivery_events (delivery_id, status, note) VALUES ($1, $2, $3)`, [delivery.id, newStatus, note || null]);
+
+    // NOTE: orders.finalized_at is owned by the inventory-finalizer consumer (it is what makes the stock deduction
+    // happen exactly once). Setting it here used to make the finalizer skip the order, leaving its stock reserved forever.
+    return { updated: true, status: newStatus };
+  });
 }
 
 export async function updateDeliveryLocation(
@@ -376,10 +354,7 @@ export async function updateDeliveryLocation(
   );
 
   if (res.rows.length === 0) {
-    const err = new Error('Delivery not found');
-    (err as any).status = 404;
-    (err as any).code = 'DELIVERY_NOT_FOUND';
-    throw err;
+    throw new AppError(404, 'DELIVERY_NOT_FOUND', 'Delivery not found');
   }
 
   return { updated: true };
@@ -405,10 +380,7 @@ export async function reportOrderIssue(
   );
 
   if (orderRes.rows.length === 0 || orderRes.rows[0].customer_id !== customerId) {
-    const err = new Error('Order not found');
-    (err as any).status = 404;
-    (err as any).code = 'ORDER_NOT_FOUND';
-    throw err;
+    throw new AppError(404, 'ORDER_NOT_FOUND', 'Order not found');
   }
 
   const order = orderRes.rows[0];

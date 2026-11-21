@@ -1,7 +1,14 @@
 import crypto from 'node:crypto';
-import { getPool } from '../db.ts';
+import type { PoolClient } from 'pg';
+import { getPool, withTx } from '../db.ts';
 import { cfg } from '../config.ts';
+import { AppError } from '../errors.ts';
+import { enqueue } from '../events.ts';
+import { log, errFields } from '../log.ts';
+import { CLEAR_CART_SQL, ORDER_LINES_FOR_STOCK_SQL } from '../sql.ts';
+import type { StockLine } from '../domain/lines.ts';
 import { getPaymentProvider, type PaymentProvider } from '../payments/provider.ts';
+import { releaseHold } from './orders.ts';
 
 export interface CreatePaymentResponse {
   provider: string;
@@ -22,11 +29,103 @@ export interface PaymentStatusResponse {
   expires_at?: string;
 }
 
+const orderNotFound = () => new AppError(404, 'ORDER_NOT_FOUND', 'Order not found');
+
+type CaptureOutcome =
+  | { kind: 'captured'; replay: boolean }
+  | { kind: 'refund'; providerPaymentId: string; amountPaise: number; paymentRowId: string };
+
+/**
+ * Turn a verified provider payment into a placed order. ONE transaction, with the order row locked, so it can never
+ * race the sweeper, a new checkout cancelling this hold, or a POS conflict moving it to NEEDS_RESCUE.
+ *
+ * Only an order still AWAITING_PAYMENT with a live hold may become PLACED. That is the same rule as PAY_SQL, so the
+ * reserved stock is guaranteed to still be held. Anything else (hold expired, cancelled, needs rescue) is refunded.
+ * A placed order emits the standard `order.placed` event, so the inventory-finalizer deducts stock exactly as for the
+ * mock /pay route.
+ */
+async function captureInTx(
+  c: PoolClient,
+  orderId: string,
+  paymentRowId: string,
+  amountPaise: number,
+  providerPaymentId: string,
+): Promise<CaptureOutcome> {
+  const cur = await c.query<{ customer_id: number; status: string; payment_status: string | null; live: boolean }>(
+    `SELECT customer_id, status, payment_status, (expires_at > now()) AS live FROM orders WHERE id = $1 FOR UPDATE`,
+    [orderId],
+  );
+  const order = cur.rows[0];
+  if (!order) throw orderNotFound();
+
+  if (order.status === 'PLACED') {
+    // Already placed (by this payment earlier, or by a webhook). Record the payment id, nothing else to do.
+    await c.query(
+      `UPDATE payments SET status = 'CAPTURED', provider_payment_id = COALESCE(provider_payment_id, $1), updated_at = now() WHERE id = $2`,
+      [providerPaymentId, paymentRowId],
+    );
+    return { kind: 'captured', replay: true };
+  }
+
+  if (order.status === 'AWAITING_PAYMENT' && order.live) {
+    await c.query(
+      `UPDATE payments SET status = 'CAPTURED', provider_payment_id = $1, updated_at = now() WHERE id = $2`,
+      [providerPaymentId, paymentRowId],
+    );
+    await c.query(
+      `UPDATE orders SET status = 'PLACED', payment_status = 'PAID', paid_at = now(), updated_at = now() WHERE id = $1`,
+      [orderId],
+    );
+    const lines = (await c.query<StockLine>(ORDER_LINES_FOR_STOCK_SQL, [orderId])).rows;
+    if (lines.length > 0) {
+      await enqueue(c, 'orders', orderId, 'order.placed', { order_id: orderId, customer_id: order.customer_id, lines });
+    }
+    await c.query(CLEAR_CART_SQL, [order.customer_id]);
+    await c.query(
+      `UPDATE deliveries SET status = 'CONFIRMED' WHERE order_id = $1 AND status = 'PENDING_PAYMENT'`,
+      [orderId],
+    );
+    await c.query(
+      `INSERT INTO delivery_events (delivery_id, status, note)
+       SELECT id, 'CONFIRMED', 'Payment received' FROM deliveries WHERE order_id = $1 AND status = 'CONFIRMED'
+         AND NOT EXISTS (SELECT 1 FROM delivery_events e WHERE e.delivery_id = deliveries.id AND e.status = 'CONFIRMED')`,
+      [orderId],
+    );
+    return { kind: 'captured', replay: false };
+  }
+
+  // The hold is gone (or about to be). Give the stock back if we still hold it, and refund the shopper.
+  if (order.status === 'AWAITING_PAYMENT') {
+    const released = await releaseHold(c, orderId, 'CANCELLED');
+    if (released && released.lines.length > 0) {
+      await enqueue(c, 'orders', orderId, 'order.expired', { order_id: orderId, customer_id: released.customerId, lines: released.lines });
+    }
+  }
+  await c.query(`UPDATE orders SET payment_status = 'REFUNDED', updated_at = now() WHERE id = $1`, [orderId]);
+  await c.query(
+    `UPDATE payments SET status = 'REFUND_PENDING', provider_payment_id = $1, updated_at = now() WHERE id = $2`,
+    [providerPaymentId, paymentRowId],
+  );
+  return { kind: 'refund', providerPaymentId, amountPaise, paymentRowId };
+}
+
 export class PaymentsService {
   private provider: PaymentProvider;
 
   constructor(providerName?: string) {
     this.provider = getPaymentProvider(providerName);
+  }
+
+  /** Refund outside the transaction (it is a network call), then record the result. */
+  private async refundAfterCommit(o: Extract<CaptureOutcome, { kind: 'refund' }>, reason: string): Promise<void> {
+    let status = 'REFUNDED';
+    try {
+      await this.provider.refund({ providerPaymentId: o.providerPaymentId, amountPaise: o.amountPaise, reason });
+    } catch (e) {
+      status = 'REFUND_FAILED';
+      log('error', 'auto-refund failed, needs manual refund', { payment_id: o.paymentRowId, ...errFields(e) });
+    }
+    await getPool().query(`UPDATE payments SET status = $1, updated_at = now() WHERE id = $2`, [status, o.paymentRowId]);
   }
 
   /**
@@ -37,38 +136,29 @@ export class PaymentsService {
 
     // 1. Validate order and check ownership (IDOR safe -> 404)
     const orderRes = await pool.query(
-      `SELECT id, customer_id, total_paise, status, payment_status, expires_at 
+      `SELECT id, customer_id, total_paise, status, payment_status, expires_at
        FROM orders WHERE id = $1`,
       [orderId]
     );
 
     if (orderRes.rows.length === 0 || orderRes.rows[0].customer_id !== customerId) {
-      const err = new Error('Order not found');
-      (err as any).statusCode = 404;
-      (err as any).code = 'ORDER_NOT_FOUND';
-      throw err;
+      throw orderNotFound();
     }
 
     const order = orderRes.rows[0];
 
     if (order.status === 'PLACED' || order.payment_status === 'PAID') {
-      const err = new Error('Order is already paid');
-      (err as any).statusCode = 400;
-      (err as any).code = 'ORDER_ALREADY_PAID';
-      throw err;
+      throw new AppError(400, 'ORDER_ALREADY_PAID', 'Order is already paid');
     }
 
     if (order.status !== 'AWAITING_PAYMENT') {
-      const err = new Error(`Order cannot be paid in current status: ${order.status}`);
-      (err as any).statusCode = 400;
-      (err as any).code = 'ORDER_NOT_PAYABLE';
-      throw err;
+      throw new AppError(400, 'ORDER_NOT_PAYABLE', `Order cannot be paid in current status: ${order.status}`);
     }
 
     // 2. Check for an existing open payment attempt (idempotency)
     const existingPaymentRes = await pool.query(
-      `SELECT id, provider, provider_order_id, amount_paise, currency, status, expires_at 
-       FROM payments 
+      `SELECT id, provider, provider_order_id, amount_paise, currency, status, expires_at
+       FROM payments
        WHERE order_id = $1 AND status = 'CREATED' AND expires_at > now()
        ORDER BY created_at DESC LIMIT 1`,
       [orderId]
@@ -89,7 +179,7 @@ export class PaymentsService {
     // 3. Create order with provider using DB total_paise (tamper-proof)
     const created = await this.provider.createOrder({
       orderId,
-      amountPaise: order.total_paise,
+      amountPaise: Number(order.total_paise),
       currency: 'INR',
       receipt: `rcpt_${orderId.replace(/-/g, '').slice(0, 16)}`,
     });
@@ -129,16 +219,12 @@ export class PaymentsService {
 
     // 1. IDOR check
     const orderRes = await pool.query(
-      `SELECT id, customer_id, total_paise, status, payment_status, expires_at 
-       FROM orders WHERE id = $1`,
+      `SELECT id, customer_id, status, payment_status FROM orders WHERE id = $1`,
       [orderId]
     );
 
     if (orderRes.rows.length === 0 || orderRes.rows[0].customer_id !== customerId) {
-      const err = new Error('Order not found');
-      (err as any).statusCode = 404;
-      (err as any).code = 'ORDER_NOT_FOUND';
-      throw err;
+      throw orderNotFound();
     }
 
     const order = orderRes.rows[0];
@@ -149,199 +235,95 @@ export class PaymentsService {
     }
 
     // 2. Fetch payment row
-    const payRes = await pool.query(
-      `SELECT id, provider, provider_order_id, amount_paise, status 
-       FROM payments 
-       WHERE order_id = $1 AND provider_order_id = $2`,
+    const payRes = await pool.query<{ id: string; amount_paise: number }>(
+      `SELECT id, amount_paise FROM payments WHERE order_id = $1 AND provider_order_id = $2`,
       [orderId, providerOrderId]
     );
 
-    if (payRes.rows.length === 0) {
-      const err = new Error('Payment record not found');
-      (err as any).statusCode = 404;
-      (err as any).code = 'PAYMENT_NOT_FOUND';
-      throw err;
-    }
-
     const payment = payRes.rows[0];
+    if (!payment) {
+      throw new AppError(404, 'PAYMENT_NOT_FOUND', 'Payment record not found');
+    }
 
     // 3. Constant-time signature verification
-    const isValid = this.provider.verifySignature({
-      orderId,
-      providerOrderId,
-      providerPaymentId,
-      signature,
-    });
+    const isValid = this.provider.verifySignature({ orderId, providerOrderId, providerPaymentId, signature });
 
     if (!isValid) {
-      await pool.query(
-        `UPDATE payments SET status = 'FAILED', updated_at = now() WHERE id = $1`,
-        [payment.id]
-      );
-      const err = new Error('Invalid payment signature');
-      (err as any).statusCode = 400;
-      (err as any).code = 'INVALID_PAYMENT_SIGNATURE';
-      throw err;
+      await pool.query(`UPDATE payments SET status = 'FAILED', updated_at = now() WHERE id = $1 AND status = 'CREATED'`, [payment.id]);
+      throw new AppError(400, 'INVALID_PAYMENT_SIGNATURE', 'Invalid payment signature');
     }
 
-    // 4. Check if order hold expired while customer was in payment popup
-    const now = new Date();
-    const isHoldExpired = order.expires_at && new Date(order.expires_at) < now;
+    // 4. Capture under a row lock. Refund instead if the hold no longer exists.
+    const outcome = await withTx((c) => captureInTx(c, orderId, payment.id, Number(payment.amount_paise), providerPaymentId));
 
-    if (isHoldExpired) {
-      // Stock hold expired: try auto-refund
-      try {
-        await this.provider.refund({
-          providerPaymentId,
-          amountPaise: payment.amount_paise,
-          reason: 'Hold expired during checkout',
-        });
-      } catch (refundErr) {
-        console.error('Auto-refund failed:', refundErr);
-      }
-
-      await pool.query(
-        `UPDATE payments SET status = 'REFUNDED', provider_payment_id = $1, updated_at = now() WHERE id = $2`,
-        [providerPaymentId, payment.id]
-      );
-      await pool.query(
-        `UPDATE orders SET status = 'CANCELLED', payment_status = 'REFUNDED', updated_at = now() WHERE id = $1`,
-        [orderId]
-      );
-
-      const err = new Error('Order hold expired before payment capture. Payment has been refunded.');
-      (err as any).statusCode = 409;
-      (err as any).code = 'STOCK_EXPIRED_REFUNDED';
-      throw err;
+    if (outcome.kind === 'refund') {
+      await this.refundAfterCommit(outcome, 'Hold expired during checkout');
+      throw new AppError(409, 'STOCK_EXPIRED_REFUNDED', 'Order hold expired before payment capture. Payment has been refunded.');
     }
 
-    // 5. Successful capture: update payment and order in single transaction
-    const client = await pool.connect();
-    try {
-      await client.query('BEGIN');
-
-      await client.query(
-        `UPDATE payments 
-         SET status = 'CAPTURED', provider_payment_id = $1, updated_at = now() 
-         WHERE id = $2`,
-        [providerPaymentId, payment.id]
-      );
-
-      await client.query(
-        `UPDATE orders 
-         SET status = 'PLACED', payment_status = 'PAID', paid_at = now(), updated_at = now() 
-         WHERE id = $1`,
-        [orderId]
-      );
-
-      // Record event
-      await client.query(
-        `INSERT INTO payment_events (provider_event_id, type, payload) 
-         VALUES ($1, 'payment.captured', $2) 
-         ON CONFLICT (provider_event_id) DO NOTHING`,
-        [
-          providerPaymentId,
-          JSON.stringify({ order_id: orderId, provider_order_id: providerOrderId, amount: payment.amount_paise }),
-        ]
-      );
-
-      // Insert outbox event for Kafka worker
-      await client.query(
-        `INSERT INTO outbox (topic, key, payload) 
-         VALUES ('orders', $1, $2)`,
-        [
-          orderId,
-          JSON.stringify({
-            event_id: crypto.randomUUID(),
-            event_type: 'order.paid',
-            order_id: orderId,
-            customer_id: customerId,
-            total_paise: payment.amount_paise,
-            provider_payment_id: providerPaymentId,
-            timestamp: now.toISOString(),
-          }),
-        ]
-      );
-
-      await client.query('COMMIT');
-    } catch (err) {
-      await client.query('ROLLBACK');
-      throw err;
-    } finally {
-      client.release();
-    }
+    await pool.query(
+      `INSERT INTO payment_events (provider_event_id, type, payload)
+       VALUES ($1, 'payment.captured', $2)
+       ON CONFLICT (provider_event_id) DO NOTHING`,
+      [`verify:${providerPaymentId}`, JSON.stringify({ order_id: orderId, provider_order_id: providerOrderId, amount: payment.amount_paise })],
+    );
 
     return { status: 'CAPTURED', paid: true, order_id: orderId };
   }
 
   /**
-   * Webhook processor (handles payment.captured, payment.failed, refund.processed)
+   * Webhook processor (handles payment.captured, payment.failed, refund.processed).
+   * `eventIdHeader` is Razorpay's X-Razorpay-Event-Id; the body itself carries no unique event id.
    */
   async handleWebhook(
     rawBody: string | Buffer,
-    signatureHeader: string
+    signatureHeader: string,
+    eventIdHeader?: string,
   ): Promise<{ received: boolean; event?: string }> {
     const verified = this.provider.verifyWebhook({ rawBody, signatureHeader });
     if (!verified.isValid) {
-      const err = new Error('Invalid webhook signature');
-      (err as any).statusCode = 400;
-      (err as any).code = 'INVALID_WEBHOOK_SIGNATURE';
-      throw err;
+      throw new AppError(400, 'INVALID_WEBHOOK_SIGNATURE', 'Invalid webhook signature');
     }
 
-    const { event, providerOrderId, providerPaymentId, amountPaise, payload } = verified;
-    const pool = getPool();
-    const eventId = payload?.id || providerPaymentId || `evt_${Date.now()}`;
+    const { event, providerOrderId, providerPaymentId, payload } = verified;
+    // Never fall back to the payment id alone: payment.captured and refund.processed share it.
+    const eventId = eventIdHeader || payload?.id || `${event ?? 'unknown'}:${providerPaymentId ?? providerOrderId ?? crypto.randomUUID()}`;
 
-    // Idempotency: record webhook event
-    const insertRes = await pool.query(
-      `INSERT INTO payment_events (provider_event_id, type, payload)
-       VALUES ($1, $2, $3)
-       ON CONFLICT (provider_event_id) DO NOTHING
-       RETURNING provider_event_id`,
-      [eventId, event || 'unknown', JSON.stringify(payload || {})]
-    );
-
-    if (insertRes.rows.length === 0) {
-      // Event was already processed
-      return { received: true, event };
-    }
-
-    if (event === 'payment.captured' && providerOrderId) {
-      // Find payment by provider_order_id
-      const payRes = await pool.query(
-        `SELECT id, order_id, status FROM payments WHERE provider_order_id = $1`,
-        [providerOrderId]
+    // Record the event and apply it in one transaction: a crash mid-way lets the provider's retry run it again.
+    const outcome = await withTx(async (c): Promise<CaptureOutcome | null> => {
+      const insertRes = await c.query(
+        `INSERT INTO payment_events (provider_event_id, type, payload)
+         VALUES ($1, $2, $3)
+         ON CONFLICT (provider_event_id) DO NOTHING
+         RETURNING provider_event_id`,
+        [eventId, event || 'unknown', JSON.stringify(payload || {})]
       );
+      if (insertRes.rows.length === 0) return null; // already processed
 
-      if (payRes.rows.length > 0) {
+      if (event === 'payment.captured' && providerOrderId && providerPaymentId) {
+        const payRes = await c.query<{ id: string; order_id: string; amount_paise: number; status: string }>(
+          `SELECT id, order_id, amount_paise, status FROM payments WHERE provider_order_id = $1`,
+          [providerOrderId]
+        );
         const payment = payRes.rows[0];
-        if (payment.status !== 'CAPTURED') {
-          await pool.query(
-            `UPDATE payments 
-             SET status = 'CAPTURED', provider_payment_id = $1, updated_at = now() 
-             WHERE id = $2`,
-            [providerPaymentId, payment.id]
-          );
-          await pool.query(
-            `UPDATE orders 
-             SET status = 'PLACED', payment_status = 'PAID', paid_at = now(), updated_at = now() 
-             WHERE id = $1`,
-            [payment.order_id]
-          );
+        if (payment && payment.status !== 'CAPTURED' && !payment.status.startsWith('REFUND')) {
+          return captureInTx(c, payment.order_id, payment.id, Number(payment.amount_paise), providerPaymentId);
         }
+      } else if (event === 'payment.failed' && providerOrderId) {
+        await c.query(
+          `UPDATE payments SET status = 'FAILED', updated_at = now() WHERE provider_order_id = $1 AND status = 'CREATED'`,
+          [providerOrderId]
+        );
+      } else if (event === 'refund.processed' && providerPaymentId) {
+        await c.query(
+          `UPDATE payments SET status = 'REFUNDED', updated_at = now() WHERE provider_payment_id = $1`,
+          [providerPaymentId]
+        );
       }
-    } else if (event === 'payment.failed' && providerOrderId) {
-      await pool.query(
-        `UPDATE payments SET status = 'FAILED', updated_at = now() WHERE provider_order_id = $1`,
-        [providerOrderId]
-      );
-    } else if (event === 'refund.processed' && providerPaymentId) {
-      await pool.query(
-        `UPDATE payments SET status = 'REFUNDED', updated_at = now() WHERE provider_payment_id = $1`,
-        [providerPaymentId]
-      );
-    }
+      return null;
+    });
+
+    if (outcome?.kind === 'refund') await this.refundAfterCommit(outcome, 'Hold expired before payment capture');
 
     return { received: true, event };
   }
@@ -358,19 +340,16 @@ export class PaymentsService {
     );
 
     if (orderRes.rows.length === 0 || orderRes.rows[0].customer_id !== customerId) {
-      const err = new Error('Order not found');
-      (err as any).statusCode = 404;
-      (err as any).code = 'ORDER_NOT_FOUND';
-      throw err;
+      throw orderNotFound();
     }
 
     const order = orderRes.rows[0];
     const isPaid = order.status === 'PLACED' || order.payment_status === 'PAID';
 
     const payRes = await pool.query(
-      `SELECT provider, provider_order_id, amount_paise, status, expires_at 
-       FROM payments 
-       WHERE order_id = $1 
+      `SELECT provider, provider_order_id, amount_paise, status, expires_at
+       FROM payments
+       WHERE order_id = $1
        ORDER BY created_at DESC LIMIT 1`,
       [orderId]
     );
@@ -380,7 +359,7 @@ export class PaymentsService {
         order_id: orderId,
         status: isPaid ? 'CAPTURED' : 'PENDING',
         provider: this.provider.name,
-        amount_paise: order.total_paise,
+        amount_paise: Number(order.total_paise),
         paid: isPaid,
       };
     }
@@ -392,49 +371,8 @@ export class PaymentsService {
       provider: payment.provider,
       provider_order_id: payment.provider_order_id,
       amount_paise: payment.amount_paise,
-      paid: isPaid || payment.status === 'CAPTURED',
+      paid: isPaid,
       expires_at: payment.expires_at ? payment.expires_at.toISOString() : undefined,
     };
-  }
-
-  /**
-   * Process refund on cancellation
-   */
-  async refundOrder(orderId: string): Promise<boolean> {
-    const pool = getPool();
-    const payRes = await pool.query(
-      `SELECT id, provider, provider_payment_id, amount_paise, status 
-       FROM payments 
-       WHERE order_id = $1 AND status = 'CAPTURED'`,
-      [orderId]
-    );
-
-    if (payRes.rows.length === 0) {
-      return false;
-    }
-
-    const payment = payRes.rows[0];
-    if (payment.provider_payment_id) {
-      try {
-        await this.provider.refund({
-          providerPaymentId: payment.provider_payment_id,
-          amountPaise: payment.amount_paise,
-          reason: 'Order cancelled by customer or staff',
-        });
-      } catch (err) {
-        console.error('Provider refund error:', err);
-      }
-    }
-
-    await pool.query(
-      `UPDATE payments SET status = 'REFUNDED', updated_at = now() WHERE id = $1`,
-      [payment.id]
-    );
-    await pool.query(
-      `UPDATE orders SET status = 'CANCELLED', payment_status = 'REFUNDED', updated_at = now() WHERE id = $1`,
-      [orderId]
-    );
-
-    return true;
   }
 }

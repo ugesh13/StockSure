@@ -98,7 +98,20 @@ export async function releaseHold(
  *  4. Any failed line: roll everything back and report the failed lines (the caller builds the Rescue Ladder).
  *  5. All good: insert lines. Ledger and outbox rows were written per line. Commit.
  */
-export async function checkout(customerId: number, idempotencyKey: string, fulfilment: Fulfilment, branchId?: number): Promise<CheckoutResult> {
+export type CheckoutExtras = {
+  /** Added to the order total, e.g. the delivery fee. Charged with the goods, so the payment amount is right. */
+  extraPaise?: number;
+  /** Runs inside the checkout transaction after the order is reserved, e.g. to write the delivery record atomically. */
+  afterReserve?: (c: PoolClient, orderId: string) => Promise<void>;
+};
+
+export async function checkout(
+  customerId: number,
+  idempotencyKey: string,
+  fulfilment: Fulfilment,
+  branchId?: number,
+  extras: CheckoutExtras = {},
+): Promise<CheckoutResult> {
   try {
     return await withTx(async (c): Promise<CheckoutResult> => {
       // A retry of a request that already created an order must return that order, even after payment emptied the cart.
@@ -112,7 +125,7 @@ export async function checkout(customerId: number, idempotencyKey: string, fulfi
       const cart = await c.query<PricedLine>(CART_LINES_SQL, [customerId]);
       if (cart.rows.length === 0) throw new AppError(400, 'EMPTY_CART', 'Your cart is empty.');
       const lines = sortLines(cart.rows);
-      const total = lines.reduce((sum, l) => sum + l.unit_price_paise * l.qty, 0);
+      const total = lines.reduce((sum, l) => sum + l.unit_price_paise * l.qty, 0) + (extras.extraPaise ?? 0);
 
       if (fulfilment === 'IN_STORE') {
         if (!branchId) throw new AppError(400, 'BAD_INPUT', 'branch_id is required for IN_STORE fulfilment');
@@ -163,6 +176,7 @@ export async function checkout(customerId: number, idempotencyKey: string, fulfi
         lines.map((l) => l.qty),
         lines.map((l) => l.unit_price_paise),
       ]);
+      if (extras.afterReserve) await extras.afterReserve(c, orderId);
       const order = await loadOrder(c, orderId);
       if (!order) throw new Error('order vanished inside its own transaction');
       return { ok: true, replay: false, order };
@@ -191,6 +205,7 @@ export async function payOrder(customerId: number, orderId: string): Promise<{ o
     const lines = (await c.query<StockLine>(ORDER_LINES_FOR_STOCK_SQL, [orderId])).rows;
     await enqueue(c, 'orders', orderId, 'order.placed', { order_id: orderId, customer_id: customerId, lines });
     await c.query(CLEAR_CART_SQL, [customerId]);
+    await c.query(`UPDATE deliveries SET status = 'CONFIRMED' WHERE order_id = $1 AND status = 'PENDING_PAYMENT'`, [orderId]);
     const order = await loadOrder(c, orderId);
     if (!order) throw notFound('Order');
     return { order, replay: false };
