@@ -203,6 +203,59 @@ export async function getOrder(customerId: number, orderId: string, db: Db): Pro
   return order;
 }
 
+export async function listOrders(
+  customerId: number,
+  options: { limit?: number; before?: string },
+  db: Db,
+): Promise<{ orders: OrderView[]; next_before: string | null }> {
+  const limit = Math.min(Math.max(options.limit ?? 20, 1), 50);
+  const before = options.before?.trim() ? options.before.trim() : null;
+
+  const ordersRes = await db.query<Omit<OrderView, 'lines'>>(
+    `SELECT id, customer_id, status, total_paise, fulfilment, expires_at, created_at, paid_at, finalized_at
+       FROM orders
+      WHERE customer_id = $1
+        AND ($2::timestamptz IS NULL OR created_at < $2::timestamptz)
+      ORDER BY created_at DESC
+      LIMIT $3`,
+    [customerId, before, limit],
+  );
+
+  const orderRows = ordersRes.rows;
+  if (orderRows.length === 0) {
+    return { orders: [], next_before: null };
+  }
+
+  const orderIds = orderRows.map((o) => o.id);
+  const linesRes = await db.query<OrderLineView & { order_id: string }>(
+    `SELECT l.order_id, l.product_id, p.name, l.branch_id, b.name AS branch_name, b.city, l.qty, l.unit_price_paise
+       FROM order_lines l
+       JOIN products p ON p.id = l.product_id
+       JOIN branches b ON b.id = l.branch_id
+      WHERE l.order_id = ANY($1::uuid[])
+      ORDER BY l.product_id`,
+    [orderIds],
+  );
+
+  const linesByOrder = new Map<string, OrderLineView[]>();
+  for (const row of linesRes.rows) {
+    const { order_id, ...line } = row;
+    const existing = linesByOrder.get(order_id);
+    if (existing) existing.push(line);
+    else linesByOrder.set(order_id, [line]);
+  }
+
+  const orders: OrderView[] = orderRows.map((o) => ({
+    ...o,
+    lines: linesByOrder.get(o.id) ?? [],
+  }));
+
+  const last = orders[orders.length - 1];
+  const next_before = orders.length === limit && last ? new Date(last.created_at).toISOString() : null;
+
+  return { orders, next_before };
+}
+
 /** The shopper gives up an unpaid hold: stock returns to sale at once. */
 export async function cancelOrder(customerId: number, orderId: string): Promise<OrderView> {
   return withTx(async (c) => {

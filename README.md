@@ -92,6 +92,11 @@ When a branch's last heartbeat is older than 60 seconds (or has never checked in
 | `npm run warmup` | Before demo: wakes all three services and waits until healthy. |
 | `npm run pos-sim -- --sales` | Store heartbeats (keeps branches fresh) and random in-store sales. |
 
+## Not built
+
+- **Delivery**: There is no courier integration, dispatch dispatching, or automated inter-branch transfers. `DELIVERY` exists purely as a fulfilment flag on orders and checkout.
+- **Zoho Inventory**: The Zoho adapter is fully implemented with OAuth refresh, retry on 401, and simulated fallback, but is not verified against a live Zoho production account.
+
 ## API Endpoints (all JSON)
 
 ### Shopper & Storefront

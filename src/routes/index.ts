@@ -9,7 +9,7 @@ import { reindexAll } from '../search/reindex.ts';
 import { ALERT_INSERT_SQL, STOCK_EXISTS_SQL } from '../sql.ts';
 import { addToCart, clearCart, getCart, removeItem, setQty } from '../services/cart.ts';
 import { getProduct, listBranches, listCategories, listProducts } from '../services/catalog.ts';
-import { cancelOrder, checkout, getOrder, payOrder } from '../services/orders.ts';
+import { cancelOrder, checkout, getOrder, listOrders, payOrder } from '../services/orders.ts';
 import { heartbeat, posSale, restock, staffCount } from '../services/pos.ts';
 import { proofFor, recentEvents } from '../services/proof.ts';
 import { applyRescueToCart, rescueForOrder } from '../services/rescue.ts';
@@ -20,7 +20,7 @@ import { AppError, notFound } from '../errors.ts';
 import { withTimeout } from '../util.ts';
 import { syncInventoryWithZoho } from '../integrations/zoho.ts';
 import { IdSchema, UuidSchema, customerOf, idempotencyKeyOf, requireAdmin, requireDemoOrStaff, requireStaff, respondCheckout, shopperCityOf } from './common.ts';
-import { createSession } from '../services/session.ts';
+import { createSession, deleteCustomerAccount } from '../services/session.ts';
 import {
   addProductRequest,
   getProductRequests,
@@ -93,11 +93,40 @@ export function registerRoutes(app: FastifyInstance): void {
     });
   });
 
-  // ---------- session ----------
+  // ---------- session & customer ----------
   app.post('/session', LIMIT(20), async (req) => {
     const b = z.object({ name: z.string().max(80).optional() }).parse(req.body ?? {});
     return createSession(b.name);
   });
+
+  app.delete(
+    '/me',
+    {
+      ...LIMIT(10),
+      schema: {
+        tags: ['Storefront'],
+        summary: 'Delete customer account',
+        description: 'Delete customer account, active cart, alerts, and sessions, and anonymize user record',
+        response: {
+          200: {
+            type: 'object',
+            properties: {
+              ok: { type: 'boolean' },
+              message: { type: 'string' },
+            },
+          },
+        },
+      },
+    },
+    async (req) => {
+      const token = req.headers['x-session-token'];
+      if (!token || typeof token !== 'string' || !token.trim()) {
+        throw new AppError(401, 'SESSION_REQUIRED', 'Session token is required to delete account.');
+      }
+      const customerId = await customerOf(req);
+      return deleteCustomerAccount(customerId);
+    },
+  );
 
   // ---------- browse ----------
   app.get('/products', LIMIT(240), async (req) => {
@@ -194,6 +223,44 @@ export function registerRoutes(app: FastifyInstance): void {
     const customerId = await customerOf(req);
     return { order: await cancelOrder(customerId, id) };
   });
+  app.get(
+    '/orders',
+    {
+      ...LIMIT(120),
+      schema: {
+        tags: ['Cart & Orders'],
+        summary: 'List caller orders',
+        description: "List caller's own orders newest first with limit and before cursor",
+        querystring: {
+          type: 'object',
+          properties: {
+            limit: { type: 'integer', default: 20, minimum: 1, maximum: 50 },
+            before: { type: 'string', description: 'ISO 8601 timestamp cursor' },
+          },
+        },
+        response: {
+          200: {
+            type: 'object',
+            properties: {
+              orders: { type: 'array' },
+              next_before: { type: ['string', 'null'] },
+            },
+          },
+        },
+      },
+    },
+    async (req) => {
+      const custId = await customerOf(req);
+      const q = z
+        .object({
+          limit: z.coerce.number().int().min(1).max(50).default(20),
+          before: z.string().optional(),
+        })
+        .parse(req.query);
+      return listOrders(custId, q, getPool());
+    },
+  );
+
   app.get('/orders/:id', LIMIT(120), async (req) => {
     const { id } = OrderParams.parse(req.params);
     const customerId = await customerOf(req);
