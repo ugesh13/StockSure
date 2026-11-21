@@ -1,0 +1,44 @@
+[
+  {
+    "id": "delivery-timings",
+    "category": "delivery",
+    "keywords": ["delivery time", "how fast", "how long", "when will it arrive", "fast delivery", "eta", "instant dispatch"],
+    "question": "How fast is delivery?",
+    "answer": "We dispatch from our local flagship provisions hubs within 45 minutes across Bengaluru, Mumbai, Delhi, Ahmedabad, Kolkata, and Pune. Typical door-to-door delivery takes between 30 and 60 minutes depending on your distance."
+  },
+  {
+    "id": "delivery-charges",
+    "category": "delivery",
+    "keywords": ["delivery fee", "delivery charge", "free delivery", "shipping cost", "cost of delivery"],
+    "question": "What are your delivery fees?",
+    "answer": "Delivery is 100% FREE on all orders of ₹999 and above! For smaller orders, delivery starts at ₹49 base fee plus ₹15 per kilometer from your nearest branch."
+  },
+  {
+    "id": "store-pickup",
+    "category": "pickup",
+    "keywords": ["store pickup", "self pickup", "click and collect", "takeaway", "pick up"],
+    "question": "Can I pick up my order directly from the store?",
+    "answer": "Yes! Choose 'Store Pickup' at checkout. Your order will be packed and ready at the store pickup counter within 15 minutes with zero convenience fees."
+  },
+  {
+    "id": "payment-methods",
+    "category": "payments",
+    "keywords": ["payment options", "upi", "credit card", "debit card", "netbanking", "paytm", "gpay", "phonepe"],
+    "question": "What payment methods are supported?",
+    "answer": "We accept all major payment methods via secure checkout: UPI (Google Pay, PhonePe, Paytm, BHIM), Credit/Debit Cards (Visa, MasterCard, RuPay), and Net Banking."
+  },
+  {
+    "id": "refunds-cancellations",
+    "category": "refunds",
+    "keywords": ["refund", "cancel order", "money back", "return", "cancellation policy"],
+    "question": "How do refunds and order cancellations work?",
+    "answer": "You can cancel any unfulfilled order directly from your Orders page for an instant 100% refund. For delivered items with quality issues, report the issue within 48 hours for immediate replacement or refund."
+  },
+  {
+    "id": "stock-freshness",
+    "category": "stock",
+    "keywords": ["live stock", "stock accuracy", "freshness", "authentic", "real time stock", "out of stock"],
+    "question": "How accurate is the inventory shown online?",
+    "answer": "StockSure uses real-time transactional reservation with Apache Kafka events. Every item shown as 'In Stock' is verified against physical branch shelf counts, preventing ghost inventory or double-selling."
+  }
+]

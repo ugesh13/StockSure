@@ -25,6 +25,9 @@ import { createSession, deleteCustomerAccount } from '../services/session.ts';
 import { authRoutes } from './auth.ts';
 import { paymentRoutes } from './payments.ts';
 import { mapsRoutes } from './maps.ts';
+import { deliveryRoutes } from './delivery.ts';
+import { chatRoutes } from './chat.ts';
+import { validateDeliveryAddress, getDeliveryQuote, createDeliveryRecord } from '../services/delivery.ts';
 import {
   addProductRequest,
   getProductRequests,
@@ -45,6 +48,7 @@ const ItemParams = z.object({ productId: IdSchema, branchId: IdSchema });
 const CheckoutBody = z.object({
   fulfilment: z.enum(['PICKUP', 'DELIVERY', 'IN_STORE']).default('PICKUP'),
   branch_id: IdSchema.optional(),
+  address: z.any().optional(),
 });
 const OrderParams = z.object({ id: UuidSchema });
 
@@ -89,6 +93,8 @@ export function registerRoutes(app: FastifyInstance): void {
   app.register(authRoutes);
   app.register(paymentRoutes);
   app.register(mapsRoutes);
+  app.register(deliveryRoutes);
+  app.register(chatRoutes);
 
   // ---------- health ----------
   app.get('/health', async (_req, reply) => {
@@ -218,7 +224,35 @@ export function registerRoutes(app: FastifyInstance): void {
   app.post('/checkout', LIMIT(120), async (req, reply) => {
     const body = CheckoutBody.parse(req.body ?? {});
     const customerId = await customerOf(req);
+
+    let validatedAddress: any = null;
+    let quote: any = null;
+    if (body.fulfilment === 'DELIVERY') {
+      if (!body.address) {
+        throw new AppError(422, 'MISSING_ADDRESS', 'Delivery address is required when fulfilment is DELIVERY');
+      }
+      validatedAddress = validateDeliveryAddress(body.address);
+      quote = await getDeliveryQuote(validatedAddress.lat, validatedAddress.lng);
+      if (!quote.serviceable) {
+        throw new AppError(400, 'OUT_OF_SERVICE_AREA', quote.reason || 'Address is outside our delivery radius');
+      }
+      if (!body.branch_id && quote.branch_id) {
+        body.branch_id = quote.branch_id;
+      }
+    }
+
     const result = await checkout(customerId, idempotencyKeyOf(req), body.fulfilment, body.branch_id);
+
+    if (result.ok && result.order && body.fulfilment === 'DELIVERY' && validatedAddress && quote && !result.replay) {
+      await createDeliveryRecord(
+        result.order.id,
+        body.branch_id || quote.branch_id,
+        validatedAddress,
+        quote.distance_km || 0,
+        quote.fee_paise || 0
+      );
+    }
+
     return respondCheckout(reply, result, shopperCityOf(req));
   });
   app.post('/orders/:id/pay', LIMIT(30), async (req) => {

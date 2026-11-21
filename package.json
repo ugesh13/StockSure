@@ -32,7 +32,7 @@
     "pos-sim": "node --env-file-if-exists=.env scripts/pos-simulator.ts",
     "bad-event": "node --env-file-if-exists=.env scripts/bad-event.ts",
     "typecheck": "tsc --noEmit",
-    "test:unit": "node --env-file-if-exists=.env --test test/domain.test.ts test/zoho.test.ts test/zoho-mock.test.ts test/migrations.test.ts test/f2-auth.test.ts test/f3-ratelimit.test.ts test/f4-swagger.test.ts test/env-docs.test.ts test/f8-orders-me.test.ts test/f12-patch-safety.test.ts test/nursery-inactive.test.ts test/auth-features.test.ts test/payments.test.ts test/maps.test.ts",
+    "test:unit": "node --env-file-if-exists=.env --test test/domain.test.ts test/zoho.test.ts test/zoho-mock.test.ts test/migrations.test.ts test/f2-auth.test.ts test/f3-ratelimit.test.ts test/f4-swagger.test.ts test/env-docs.test.ts test/f8-orders-me.test.ts test/f12-patch-safety.test.ts test/nursery-inactive.test.ts test/auth-features.test.ts test/payments.test.ts test/maps.test.ts test/delivery.test.ts test/chat.test.ts",
     "test:db": "node --env-file-if-exists=.env --test test/auth.test.ts test/demo-routes.test.ts test/swagger.test.ts test/sql.test.ts && node --env-file-if-exists=.env test/t0-test.ts && node --env-file-if-exists=.env test/t1-test.ts && node --env-file-if-exists=.env test/t2-test.ts && node --env-file-if-exists=.env test/t3-test.ts && node --env-file-if-exists=.env test/t4-test.ts",
     "test": "npm run test:unit && npm run test:db",
     "test:sql": "node --env-file-if-exists=.env --test test/sql.test.ts",
