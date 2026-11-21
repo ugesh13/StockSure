@@ -20,6 +20,8 @@ function findCataloguePath(): string {
     path.resolve(process.cwd(), 'catalogue.psv'),
     path.resolve(process.cwd(), '../catalogue.psv'),
     path.resolve(process.cwd(), 'Backend/catalogue.psv'),
+    path.resolve(process.cwd(), '../_parked_not_for_git/catalogue.psv'),
+    path.resolve(process.cwd(), '_parked_not_for_git/catalogue.psv'),
   ];
   for (const c of candidates) {
     if (fs.existsSync(c)) return c;
