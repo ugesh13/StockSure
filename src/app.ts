@@ -98,59 +98,62 @@ export async function buildApp(): Promise<FastifyInstance> {
   });
   app.setNotFoundHandler((_req, reply) => reply.status(404).send({ error: { code: 'NOT_FOUND', message: 'No such route.', details: [] } }));
 
-  await app.register(swagger, {
-    openapi: {
-      info: {
-        title: 'StockSure API',
-        description: 'StockSure backend: Fastify API + Kafka worker on Aiven PostgreSQL, Kafka and OpenSearch',
-        version: '1.0.0',
-      },
-      components: {
-        securitySchemes: {
-          sessionToken: {
-            type: 'apiKey',
-            name: 'X-Session-Token',
-            in: 'header',
-            description: 'Guest session token obtained from POST /session (required on shopping routes)',
-          },
-          customerId: {
-            type: 'apiKey',
-            name: 'X-Customer-Id',
-            in: 'header',
-            description: 'Customer ID (demo shoppers 1..20 allowed without session token when DEMO_MODE=true)',
-          },
-          staffKey: {
-            type: 'apiKey',
-            name: 'X-Staff-Key',
-            in: 'header',
-            description: 'Staff secret key from STAFF_KEY env variable for staff operations and demo routes',
-          },
-          adminToken: {
-            type: 'apiKey',
-            name: 'X-Admin-Token',
-            in: 'header',
-            description: 'Admin secret token from ADMIN_TOKEN env variable for admin recovery operations',
+  const shouldExposeDocs = c.NODE_ENV !== 'production' || c.DOCS_ENABLED;
+  if (shouldExposeDocs) {
+    await app.register(swagger, {
+      openapi: {
+        info: {
+          title: 'StockSure API',
+          description: 'StockSure backend: Fastify API + Kafka worker on Aiven PostgreSQL, Kafka and OpenSearch',
+          version: '1.0.0',
+        },
+        components: {
+          securitySchemes: {
+            sessionToken: {
+              type: 'apiKey',
+              name: 'X-Session-Token',
+              in: 'header',
+              description: 'Guest session token obtained from POST /session (required on shopping routes)',
+            },
+            customerId: {
+              type: 'apiKey',
+              name: 'X-Customer-Id',
+              in: 'header',
+              description: 'Customer ID (demo shoppers 1..20 allowed without session token when DEMO_MODE=true)',
+            },
+            staffKey: {
+              type: 'apiKey',
+              name: 'X-Staff-Key',
+              in: 'header',
+              description: 'Staff secret key from STAFF_KEY env variable for staff operations and demo routes',
+            },
+            adminToken: {
+              type: 'apiKey',
+              name: 'X-Admin-Token',
+              in: 'header',
+              description: 'Admin secret token from ADMIN_TOKEN env variable for admin recovery operations',
+            },
           },
         },
+        tags: [
+          { name: 'Storefront', description: 'Catalog, branches, search, and 3D shelves' },
+          { name: 'Cart & Orders', description: 'Cart management, guarded reserve checkout, payments' },
+          { name: 'Kiosk & Rescue', description: 'Kiosk cart codes and branch rescue ladder' },
+          { name: 'Staff', description: 'Staff live stock adjustments and product creation' },
+          { name: 'Demo', description: 'Demo pipeline status, proof inspect, and events (/demo/*, protected unless DEMO_MODE=true)' },
+          { name: 'Admin', description: 'DLQ replay, OpenSearch reindexing, Zoho inventory sync' },
+        ],
       },
-      tags: [
-        { name: 'Storefront', description: 'Catalog, branches, search, and 3D shelves' },
-        { name: 'Cart & Orders', description: 'Cart management, guarded reserve checkout, payments' },
-        { name: 'Kiosk & Rescue', description: 'Kiosk cart codes and branch rescue ladder' },
-        { name: 'Staff', description: 'Staff live stock adjustments and product creation' },
-        { name: 'Demo', description: 'Demo pipeline status, proof inspect, and events (/demo/*, protected unless DEMO_MODE=true)' },
-        { name: 'Admin', description: 'DLQ replay, OpenSearch reindexing, Zoho inventory sync' },
-      ],
-    },
-  });
+    });
 
-  await app.register(swaggerUi, {
-    routePrefix: '/docs',
-    uiConfig: {
-      docExpansion: 'list',
-      deepLinking: false,
-    },
-  });
+    await app.register(swaggerUi, {
+      routePrefix: '/docs',
+      uiConfig: {
+        docExpansion: 'list',
+        deepLinking: false,
+      },
+    });
+  }
 
   registerRoutes(app);
   return app;

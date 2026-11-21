@@ -52,6 +52,7 @@ Only variable names are listed. Values must be provided in `.env` (never committ
 - `STAFF_KEY` / `STAFF_API_KEY`: Secret key for staff endpoints
 - `ADMIN_TOKEN`: Secret token for admin endpoints
 - `CORS_ORIGINS`: Comma-separated allowed CORS origins (default `http://localhost:5173`)
+- `DOCS_ENABLED`: Expose Swagger UI at `/docs` in production when set to `true` (default `false` in production, enabled in development)
 - `ALLOW_DESTRUCTIVE`: Set to `1` to authorize destructive operations like `npm run seed -- --reset`
 
 ## Why every branch shows CONFIRM_WITH_STORE

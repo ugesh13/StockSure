@@ -56,6 +56,7 @@ const Schema = z.object({
   RUN_RELAY: flag(true),
   RUN_SWEEPER: flag(true),
   DEMO_MODE: flag(false),
+  DOCS_ENABLED: flag(false),
 
   ZOHO_CLIENT_ID: str(),
   ZOHO_CLIENT_SECRET: str(),
