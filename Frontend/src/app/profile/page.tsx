@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import DynamicIslandNavbar from '@/components/DynamicIslandNavbar';
 import AuthModal from '@/components/AuthModal';
 import { useAuth } from '@/context/AuthContext';
@@ -41,11 +41,31 @@ import {
 type TabType = 'orders' | 'profile' | 'addresses' | 'preferences' | 'security';
 
 export default function ProfilePage() {
+  return (
+    <React.Suspense fallback={<div className="min-h-screen bg-cream flex items-center justify-center text-forest text-xs font-semibold">Loading botanical profile...</div>}>
+      <ProfileContent />
+    </React.Suspense>
+  );
+}
+
+function ProfileContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { user, logout, openAuthModal } = useAuth();
   const { selectedBranch, branches, setSelectedBranch } = useCart();
 
-  const [activeTab, setActiveTab] = useState<TabType>('orders');
+  const tabParam = searchParams?.get('tab');
+  const [activeTab, setActiveTab] = useState<TabType>(
+    tabParam === 'profile' || tabParam === 'addresses' || tabParam === 'preferences' || tabParam === 'security'
+      ? (tabParam as TabType)
+      : 'orders'
+  );
+
+  useEffect(() => {
+    if (tabParam && ['orders', 'profile', 'addresses', 'preferences', 'security'].includes(tabParam)) {
+      setActiveTab(tabParam as TabType);
+    }
+  }, [tabParam]);
 
   // Orders State
   const [orders, setOrders] = useState<Order[]>([]);

@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import React, { useState } from 'react';
 import confetti from 'canvas-confetti';
@@ -426,17 +426,17 @@ export default function CheckoutModal({ isOpen, onClose, onOrderSuccess }: Check
               </div>
             </div>
 
-            {/* Payment Options Grid - Razorpay Secure Checkout */}
+            {/* Payment Options Grid */}
             <div className="space-y-3">
               <label className="text-[11px] font-bold uppercase tracking-wider text-darktext/80 block">
-                Payment Method
+                Select Payment Option
               </label>
 
-              {/* Razorpay Gateway */}
-              <div className="p-5 rounded-panel bg-white border-2 border-forest shadow-xs transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <div className="flex items-start gap-3.5">
-                  <div className="w-10 h-10 rounded-full bg-forest/10 flex items-center justify-center text-forest shrink-0 mt-0.5">
-                    <CreditCard className="w-5 h-5 text-forest" />
+              {/* Option 1: Razorpay Gateway */}
+              <div className="p-4 rounded-panel bg-white border-2 border-forest/20 hover:border-forest shadow-xs transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex items-start gap-3">
+                  <div className="w-9 h-9 rounded-full bg-forest/10 flex items-center justify-center text-forest shrink-0 mt-0.5">
+                    <CreditCard className="w-5 h-5" />
                   </div>
                   <div>
                     <div className="flex items-center gap-2">
@@ -445,8 +445,8 @@ export default function CheckoutModal({ isOpen, onClose, onOrderSuccess }: Check
                         Cards · UPI · NetBanking
                       </span>
                     </div>
-                    <p className="text-xs text-darktext/70 mt-1">
-                      Pay safely via Google Pay, PhonePe, UPI ID, Debit/Credit Cards, or Netbanking.
+                    <p className="text-xs text-darktext/70 mt-0.5">
+                      Pay via Google Pay, PhonePe, Cards, or Netbanking with live signature verification.
                     </p>
                   </div>
                 </div>
@@ -455,9 +455,38 @@ export default function CheckoutModal({ isOpen, onClose, onOrderSuccess }: Check
                   type="button"
                   disabled={loading}
                   onClick={handleRazorpayPay}
-                  className="px-6 py-3 rounded-button bg-forest text-cream font-bold text-xs uppercase tracking-wider hover:bg-forest-700 transition-colors shadow-elevated disabled:opacity-50 shrink-0"
+                  className="px-5 py-2.5 rounded-button bg-forest text-cream font-semibold text-xs uppercase tracking-wider hover:bg-forest-700 transition-colors shadow-sm disabled:opacity-50 shrink-0"
                 >
-                  {loading ? 'Opening Razorpay...' : `Pay ₹${total}`}
+                  {loading ? 'Opening...' : `Pay ₹${total}`}
+                </button>
+              </div>
+
+              {/* Option 2: Instant Sandbox Simulator */}
+              <div className="p-4 rounded-panel bg-emerald-50/70 border-2 border-emerald-300 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex items-start gap-3">
+                  <div className="w-9 h-9 rounded-full bg-emerald-600/10 flex items-center justify-center text-emerald-800 shrink-0 mt-0.5">
+                    <Sparkles className="w-5 h-5 text-emerald-700" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h4 className="text-sm font-bold text-emerald-950">Simulated Test Authorization</h4>
+                      <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-emerald-200 text-emerald-900">
+                        Instant Approval
+                      </span>
+                    </div>
+                    <p className="text-xs text-emerald-800/80 mt-0.5">
+                      One-click simulated authorization for evaluation, bypassing external payment popups.
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  disabled={loading}
+                  onClick={handleSimulatedPay}
+                  className="px-5 py-2.5 rounded-button bg-emerald-700 hover:bg-emerald-800 text-white font-semibold text-xs uppercase tracking-wider transition-colors shadow-sm disabled:opacity-50 shrink-0"
+                >
+                  {loading ? 'Approving...' : 'Authorize (Test)'}
                 </button>
               </div>
             </div>

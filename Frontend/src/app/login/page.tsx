@@ -1,21 +1,35 @@
 'use client';
 
-import React, { Suspense } from 'react';
-import GateEntry from '@/components/GateEntry';
+import React, { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { useAuth } from '@/context/AuthContext';
+import DynamicIslandNavbar from '@/components/DynamicIslandNavbar';
+import AuthModal from '@/components/AuthModal';
 
 export default function LoginPage() {
+  const router = useRouter();
+  const { user, openAuthModal } = useAuth();
+
+  useEffect(() => {
+    if (user) {
+      router.push('/profile');
+    } else {
+      openAuthModal('login');
+    }
+  }, [user, router, openAuthModal]);
+
   return (
-    <Suspense
-      fallback={
-        <div className="min-h-screen bg-[#6c5d3b] flex items-center justify-center text-cream">
-          <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
-            <span className="text-xs uppercase tracking-widest font-semibold">Opening StockSure Sanctuary...</span>
-          </div>
-        </div>
-      }
-    >
-      <GateEntry />
-    </Suspense>
+    <div className="min-h-screen bg-cream text-darktext flex flex-col justify-center items-center p-4">
+      <DynamicIslandNavbar />
+      <AuthModal />
+      <div className="text-center space-y-3 pt-24">
+        <h1 className="editorial-serif text-3xl font-light text-forest">
+          StockSure Botanical Portal
+        </h1>
+        <p className="text-xs text-darktext/70">
+          Sign in or create an account to manage your plant orders.
+        </p>
+      </div>
+    </div>
   );
 }
