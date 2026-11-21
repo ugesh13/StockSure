@@ -19,6 +19,14 @@ export type DocSource = {
   reserved: number;
   buffer: number;
   rev: number;
+  plant_common_name?: string | null;
+  name_hi?: string | null;
+  name_kn?: string | null;
+  scientific_name?: string | null;
+  aliases?: string[] | null;
+  variant_group?: string | null;
+  variant_size?: string | null;
+  is_active?: boolean;
 };
 
 export type SearchDoc = {
@@ -37,6 +45,14 @@ export type SearchDoc = {
   status: BaseStatus;
   rev: number;
   updated_at: string;
+  plant_common_name?: string | null;
+  name_hi?: string | null;
+  name_kn?: string | null;
+  scientific_name?: string | null;
+  aliases?: string[] | null;
+  variant_group?: string | null;
+  variant_size?: string | null;
+  is_active?: boolean;
 };
 
 export const docId = (productId: number, branchId: number): string => `${productId}:${branchId}`;
@@ -62,5 +78,13 @@ export function buildDoc(s: DocSource, lowStock: number, updatedAtIso: string): 
     status: stockStatus(available, lowStock),
     rev: s.rev,
     updated_at: updatedAtIso,
+    plant_common_name: s.plant_common_name ?? null,
+    name_hi: s.name_hi ?? null,
+    name_kn: s.name_kn ?? null,
+    scientific_name: s.scientific_name ?? null,
+    aliases: s.aliases ?? null,
+    variant_group: s.variant_group ?? null,
+    variant_size: s.variant_size ?? null,
+    is_active: s.is_active ?? true,
   };
 }

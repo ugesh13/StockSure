@@ -207,6 +207,11 @@ try {
 
   // 5. POST /cart/code & GET /kiosk/cart/:code
   console.log('5. Checking POST /cart/code and GET /kiosk/cart/:code...');
+  // Find an active product available at branch 1
+  const activeProdRes = await fetch(`${BASE}/products?pageSize=1`);
+  const activeProdData = (await activeProdRes.json()) as any;
+  const testProductId = activeProdData?.products?.[0]?.id ?? 3;
+
   // Add an item to cart first
   await fetch(`${BASE}/cart/items`, {
     method: 'POST',
@@ -215,7 +220,7 @@ try {
       'X-Customer-Id': String(sessionJson.customer_id),
       'X-Session-Token': sessionJson.token,
     },
-    body: JSON.stringify({ product_id: 3, branch_id: 1, qty: 2 }),
+    body: JSON.stringify({ product_id: testProductId, branch_id: 1, qty: 1 }),
   });
 
   const resCode = await fetch(`${BASE}/cart/code`, {

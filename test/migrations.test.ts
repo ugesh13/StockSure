@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 
 test('F1 Migrations: file names are contiguous and 002 exists', () => {
   const dir = join(dirname(fileURLToPath(import.meta.url)), '..', 'sql');
-  const files = readdirSync(dir).filter((f) => f.endsWith('.sql')).sort();
+  const files = readdirSync(dir).filter((f) => f.endsWith('.sql') && !f.startsWith('rollback')).sort();
 
   // 1. Check 002 exists
   const has002 = files.some((f) => f.startsWith('002_'));
