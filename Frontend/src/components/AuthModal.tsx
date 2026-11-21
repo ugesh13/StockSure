@@ -51,10 +51,16 @@ export default function AuthModal() {
     setIsSubmitting(false);
   };
 
-  const handleFillDemoUser = () => {
+  const handleFillDemoUser = async () => {
     setEmail('priya@stocksure.in');
-    setPassword('plantlover2026');
+    setPassword('Password123!');
     setErrorMessage('');
+    setIsSubmitting(true);
+    const res = await login('priya@stocksure.in', 'Password123!');
+    if (!res.success) {
+      setErrorMessage(res.message || 'Unable to sign in with demo account.');
+    }
+    setIsSubmitting(false);
   };
 
   return (
