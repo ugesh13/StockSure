@@ -19,6 +19,7 @@ export async function GET(req: NextRequest) {
         id: user.id,
         name: user.name,
         email: user.email,
+        role: user.role || (user.email.toLowerCase() === 'admin@verdantnursery.com' ? 'admin' : 'customer'),
         createdAt: user.createdAt,
       },
     });

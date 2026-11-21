@@ -25,6 +25,7 @@ export async function POST(req: NextRequest) {
       id: user.id,
       name: user.name,
       email: user.email,
+      role: user.role || (user.email.toLowerCase() === 'admin@verdantnursery.com' ? 'admin' : 'customer'),
       createdAt: user.createdAt,
     };
 
@@ -32,6 +33,8 @@ export async function POST(req: NextRequest) {
       success: true,
       message: `Welcome back, ${user.name}!`,
       user: safeUser,
+      role: safeUser.role,
+      redirectTo: safeUser.role === 'admin' ? '/admin' : '/',
       token: `tok_${user.id}_${Date.now()}`,
     });
 
