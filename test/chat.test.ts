@@ -66,3 +66,19 @@ test('P1-BOT 6: rejects empty message and enforces 500-character ceiling', async
     /(MESSAGE_TOO_LONG|exceed 500 characters)/
   );
 });
+
+test('P1-BOT 7 (Addendum): handles CARE_TIPS from care.json without inventing advice', async () => {
+  // Known plant returns curated care notes
+  const snakePlant = await processChatMessage('care tips for snake plant');
+  assert.equal(snakePlant.intent, 'CARE_TIPS');
+  assert.ok(snakePlant.reply.includes('Care Guide for Snake plant'));
+  assert.ok(snakePlant.reply.includes('Sansevieria trifasciata'));
+  assert.ok(snakePlant.reply.includes('Light:'));
+  assert.ok(snakePlant.reply.includes('Water:'));
+
+  // Unknown plant returns honest no-notes response with human handoff suggestion
+  const unknownPlant = await processChatMessage('how to care for mythical space flower');
+  assert.equal(unknownPlant.intent, 'CARE_TIPS');
+  assert.ok(unknownPlant.reply.includes('do not have curated care notes'));
+  assert.ok(unknownPlant.suggestions?.includes('Contact human agent'));
+});

@@ -47,8 +47,30 @@ try {
     faqDatabase = JSON.parse(fs.readFileSync(faqPath, 'utf8'));
   }
 } catch {
-  // default fallback if file read fails
   faqDatabase = [];
+}
+
+interface CareItem {
+  common_name: string;
+  scientific_name: string;
+  aliases: string[];
+  light: string;
+  water: string;
+  soil: string;
+  pet_friendly: boolean;
+  verified: boolean;
+  tips: string;
+}
+
+// Load Plant Care database
+let careDatabase: CareItem[] = [];
+try {
+  const carePath = path.resolve(process.cwd(), 'data/care.json');
+  if (fs.existsSync(carePath)) {
+    careDatabase = JSON.parse(fs.readFileSync(carePath, 'utf8'));
+  }
+} catch {
+  careDatabase = [];
 }
 
 export async function processChatMessage(
@@ -176,6 +198,29 @@ export async function processChatMessage(
         suggestions: ['Browse shop', 'Contact human agent', 'Delivery timings'],
       };
     }
+  }
+
+  // 8b. PLANT CARE TIPS (curated from care.json only)
+  if (/\b(care tips?|how to care|care for|watering|plant care)\b/i.test(lower)) {
+    const matched = careDatabase.find((c) =>
+      c.aliases.some((a) => lower.includes(a)) || lower.includes(c.common_name.toLowerCase())
+    );
+
+    if (matched) {
+      const guidancePrefix = matched.verified ? '' : ' (General Guidance)';
+      const reply = `🌿 Care Guide for ${matched.common_name} (${matched.scientific_name})${guidancePrefix}:\n• Light: ${matched.light}\n• Water: ${matched.water}\n• Soil: ${matched.soil}\n• Pet-Safe: ${matched.pet_friendly ? 'Yes (Non-toxic)' : 'No (Toxic to pets)'}\n• Tip: ${matched.tips}`;
+      return {
+        intent: 'CARE_TIPS',
+        reply,
+        suggestions: ['Buy ' + matched.common_name, 'Other Plant Care', 'Store Locations'],
+      };
+    }
+
+    return {
+      intent: 'CARE_TIPS',
+      reply: `We do not have curated care notes for that plant yet. Our resident horticulturists can provide customized advice! Would you like to speak to an agent?`,
+      suggestions: ['Contact human agent', 'Browse popular indoor plants', 'Delivery charges'],
+    };
   }
 
   // 9. PRODUCT SEARCH / AVAILABILITY
