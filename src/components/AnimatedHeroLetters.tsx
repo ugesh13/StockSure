@@ -83,17 +83,21 @@ function AnimatedLetter({
   const xRaw = useTransform(
     scrollY,
     [s0, startP, s2, s3, s4, s5],
-    [0, 0, driftMax * 0.90, driftMax * 0.40, targetX, targetX]
+    [0, 0, driftMax * 0.90, driftMax * 0.40, targetX, targetX],
+    { clamp: true }
   );
 
   // 2. Vertical movement:
   // Starts at 0 in Hero -> falls downward through Hero and deep into About Us -> curves and gathers at exact center of pot
-  const midFallY = s2 * 1.15 + fallMax;
-  const lateFallY = s3 * 1.05 + fallMax * 0.5 + (targetY - s3) * 0.45;
+  const relS2 = s2 - s0;
+  const relS3 = s3 - s0;
+  const midFallY = relS2 * 0.65 + fallMax;
+  const lateFallY = relS3 * 0.85 + (targetY - relS3) * 0.5;
   const yRaw = useTransform(
     scrollY,
     [s0, startP, s2, s3, s4, s5],
-    [0, 0, midFallY, lateFallY, targetY, targetY]
+    [0, 0, midFallY, lateFallY, targetY, targetY],
+    { clamp: true }
   );
 
   // 3. Rotation:
@@ -101,7 +105,8 @@ function AnimatedLetter({
   const rotateRaw = useTransform(
     scrollY,
     [s0, startP, s2, s3, s4, s5],
-    [0, 0, rotMax * 0.85, rotMax * 0.30, 0, 0]
+    [0, 0, rotMax * 0.85, rotMax * 0.30, 0, 0],
+    { clamp: true }
   );
 
   // 4. Opacity:
@@ -109,7 +114,8 @@ function AnimatedLetter({
   const opacityRaw = useTransform(
     scrollY,
     [s0, s1, s2, s3, s4, s5],
-    [1, 1, 1, 1, 0.98, 0]
+    [1, 1, 1, 1, 0.98, 0],
+    { clamp: true }
   );
   const opacity = useTransform(opacityRaw, (v) => (v < 0.02 ? 0 : v));
 
@@ -117,7 +123,8 @@ function AnimatedLetter({
   const scaleRaw = useTransform(
     scrollY,
     [s0, s2, s3, s4, s5],
-    [1, 0.98, 0.92, 0.72, 0.18]
+    [1, 0.98, 0.92, 0.72, 0.18],
+    { clamp: true }
   );
 
   const springSettings = { stiffness: 105, damping: 24, mass: 0.8 };
@@ -147,12 +154,14 @@ interface AnimatedHeroLettersProps {
   scrollY: MotionValue<number>;
   windowHeight: number;
   aboutTop: number;
+  heroScrollStart?: number;
 }
 
 export default function AnimatedHeroLetters({
   scrollY,
   windowHeight,
   aboutTop,
+  heroScrollStart = 0,
 }: AnimatedHeroLettersProps) {
   const letterRefs = useRef<{ [key: string]: HTMLElement | null }>({});
   const [targets, setTargets] = useState<{ [key: string]: { x: number; y: number } }>({});
@@ -191,14 +200,16 @@ export default function AnimatedHeroLetters({
   }, [windowHeight, aboutTop]);
 
   // Exact Scroll Animation Milestones:
-  const H = aboutTop > 0 ? aboutTop : (windowHeight > 0 ? windowHeight : 900);
+  const H = aboutTop > 0 ? aboutTop : (windowHeight > 0 ? windowHeight * 2 : 1800);
+  const start = heroScrollStart;
+  const span = Math.max(H - start, windowHeight > 0 ? windowHeight : 900);
 
-  const s0 = 0;
-  const s1 = H * 0.10;
-  const s2 = H * 0.38;
-  const s3 = H * 0.65;
-  const s4 = H * 0.85;
-  const s5 = H * 0.92;
+  const s0 = start;
+  const s1 = start + span * 0.10;
+  const s2 = start + span * 0.38;
+  const s3 = start + span * 0.65;
+  const s4 = start + span * 0.85;
+  const s5 = start + span * 0.92;
 
   const defaultTargetY = aboutTop > 0 ? aboutTop : (windowHeight > 0 ? windowHeight : 900);
 
