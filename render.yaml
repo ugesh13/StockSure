@@ -1,0 +1,57 @@
+services:
+  - type: web
+    name: stocksure-api
+    runtime: node
+    plan: starter
+    buildCommand: npm install
+    startCommand: node src/server.ts
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3000
+      - key: DATABASE_URL
+        sync: false
+      - key: PG_CA_B64
+        sync: false
+      - key: KAFKA_BROKERS
+        sync: false
+      - key: KAFKA_CA_B64
+        sync: false
+      - key: KAFKA_SASL_USERNAME
+        sync: false
+      - key: KAFKA_SASL_PASSWORD
+        sync: false
+      - key: OPENSEARCH_URL
+        sync: false
+      - key: STAFF_KEY
+        sync: false
+      - key: ADMIN_TOKEN
+        sync: false
+      - key: DEMO_MODE
+        value: "true"
+
+  - type: worker
+    name: stocksure-worker
+    runtime: node
+    plan: starter
+    buildCommand: npm install
+    startCommand: node src/worker.ts
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false
+      - key: PG_CA_B64
+        sync: false
+      - key: KAFKA_BROKERS
+        sync: false
+      - key: KAFKA_CA_B64
+        sync: false
+      - key: KAFKA_SASL_USERNAME
+        sync: false
+      - key: KAFKA_SASL_PASSWORD
+        sync: false
+      - key: OPENSEARCH_URL
+        sync: false

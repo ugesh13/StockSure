@@ -1,0 +1,14 @@
+node_modules/
+dist/
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.cert
+*.crt
+*.log
+reports/
+logs/
+.DS_Store
+_parked_not_for_git/

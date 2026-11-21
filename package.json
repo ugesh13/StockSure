@@ -1,0 +1,49 @@
+{
+  "name": "stocksure-api",
+  "version": "0.1.0",
+  "private": true,
+  "description": "StockSure backend: Fastify API + Kafka worker on Aiven PostgreSQL, Kafka and OpenSearch",
+  "type": "module",
+  "engines": {
+    "node": ">=22.18"
+  },
+  "scripts": {
+    "start": "node --env-file-if-exists=.env src/server.ts",
+    "worker": "node --env-file-if-exists=.env src/worker.ts",
+    "dev": "node --watch --env-file-if-exists=.env src/server.ts",
+    "dev:worker": "node --watch --env-file-if-exists=.env src/worker.ts",
+    "migrate": "node --env-file-if-exists=.env scripts/migrate.ts",
+    "setup:kafka": "node --env-file-if-exists=.env scripts/setup-kafka.ts",
+    "seed": "node --env-file-if-exists=.env scripts/seed.ts",
+    "reindex": "node --env-file-if-exists=.env scripts/reindex.ts",
+    "warmup": "node --env-file-if-exists=.env scripts/warmup.ts",
+    "kafka:probe": "node --env-file-if-exists=.env scripts/kafka-probe.ts",
+    "contract:check": "node --env-file-if-exists=.env scripts/contract-check.ts",
+    "race-test": "node --env-file-if-exists=.env scripts/race-test.ts",
+    "demo:up": "node --env-file-if-exists=.env scripts/demo-up.ts",
+    "demo:reset": "node --env-file-if-exists=.env scripts/demo-reset.ts",
+    "pos-sim": "node --env-file-if-exists=.env scripts/pos-simulator.ts",
+    "bad-event": "node --env-file-if-exists=.env scripts/bad-event.ts",
+    "typecheck": "tsc --noEmit",
+    "test:unit": "node --test test/domain.test.ts test/zoho.test.ts",
+    "test:db": "node --env-file-if-exists=.env --test test/auth.test.ts test/demo-routes.test.ts test/swagger.test.ts test/sql.test.ts && node --env-file-if-exists=.env test/t0-test.ts && node --env-file-if-exists=.env test/t1-test.ts && node --env-file-if-exists=.env test/t2-test.ts && node --env-file-if-exists=.env test/t3-test.ts && node --env-file-if-exists=.env test/t4-test.ts",
+    "test": "npm run test:unit && npm run test:db",
+    "test:sql": "node --env-file-if-exists=.env --test test/sql.test.ts",
+    "postinstall": "node scripts/patch-kafkajs.ts"
+  },
+  "dependencies": {
+    "@fastify/cors": "^10.0.1",
+    "@fastify/rate-limit": "^10.1.1",
+    "@fastify/swagger": "^9.9.5",
+    "@fastify/swagger-ui": "^6.1.5",
+    "fastify": "^5.2.0",
+    "kafkajs": "^2.2.4",
+    "pg": "^8.13.1",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "@types/pg": "^8.11.10",
+    "typescript": "^5.8.3"
+  }
+}
