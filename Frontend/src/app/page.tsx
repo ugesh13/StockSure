@@ -31,6 +31,8 @@ import {
   VolumeX,
 } from 'lucide-react';
 import { useCart } from '@/context/CartContext';
+import { useAuth } from '@/context/AuthContext';
+import { useRouter } from 'next/navigation';
 import { backend } from '@/lib/backend';
 import { CONTACT_EMAIL, CONTACT_PHONE, CONTACT_ADDRESS, CONTACT_HOURS } from '@/config/site';
 
@@ -80,6 +82,8 @@ const BANGALORE_BRANCHES = [
 ];
 
 export default function Home() {
+  const router = useRouter();
+  const { user, openAuthModal } = useAuth();
   const { scrollY } = useScroll();
   const [windowHeight, setWindowHeight] = useState(900);
   const [aboutBounds, setAboutBounds] = useState({ top: 900, height: 1100 });
@@ -87,6 +91,15 @@ export default function Home() {
   const [selectedBranch, setSelectedBranch] = useState(BANGALORE_BRANCHES[0]);
   const [visitedBranchModal, setVisitedBranchModal] = useState<typeof BANGALORE_BRANCHES[0] | null>(null);
   const { setSelectedBranch: setCartBranch } = useCart();
+
+  const handleShopNow = (e: React.MouseEvent) => {
+    e.preventDefault();
+    if (!user || user.is_guest) {
+      openAuthModal('login', '/shop');
+    } else {
+      router.push('/shop');
+    }
+  };
 
   // Video card state
   const branchesVideoRef = useRef<HTMLVideoElement | null>(null);
@@ -310,6 +323,7 @@ export default function Home() {
           >
             <a
               href="/shop"
+              onClick={handleShopNow}
               className="group relative inline-flex items-center justify-center px-7 sm:px-9 py-2.5 sm:py-3 rounded-[6px] bg-[#5F7355]/70 hover:bg-white text-white hover:text-[#183D2B] border border-white/60 hover:border-white backdrop-blur-md shadow-[0_4px_20px_rgba(24,61,43,0.25)] hover:shadow-[0_8px_28px_rgba(255,255,255,0.3)] hover:-translate-y-0.5 active:translate-y-0 transition-all duration-300 ease-out font-sans font-semibold text-xs sm:text-sm tracking-wider uppercase cursor-pointer overflow-hidden"
             >
               <span className="relative z-10">Shop Now</span>
@@ -920,7 +934,7 @@ export default function Home() {
 
           <div className="flex items-center gap-6 text-white/70">
             <a href="#home" className="hover:text-white transition-colors">Home</a>
-            <a href="/shop" className="hover:text-white transition-colors">Shop</a>
+            <a href="/shop" onClick={handleShopNow} className="hover:text-white transition-colors cursor-pointer">Shop</a>
             <a href="#about" className="hover:text-white transition-colors">About Us</a>
             <a href="#branches" className="hover:text-white transition-colors">Branches</a>
             <a href="#contact" className="hover:text-white transition-colors">Contact Us</a>

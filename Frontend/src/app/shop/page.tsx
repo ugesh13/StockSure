@@ -2,14 +2,17 @@
 
 import React, { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
+import Link from 'next/link';
 import Image from 'next/image';
 import DynamicIslandNavbar from '@/components/DynamicIslandNavbar';
 import QuickViewModal from '@/components/QuickViewModal';
 import { backend, adaptProduct, Product } from '@/lib/backend';
-import { ShoppingBag, Star, Check, AlertTriangle, Eye, Loader2 } from 'lucide-react';
+import { ShoppingBag, Star, Check, AlertTriangle, Eye, Loader2, Lock, ArrowRight } from 'lucide-react';
 import { useCart } from '@/context/CartContext';
+import { useAuth } from '@/context/AuthContext';
 
 function ShopContent() {
+  const { user, loading: authLoading, openAuthModal } = useAuth();
   const searchParams = useSearchParams();
   const initialCategory = searchParams.get('category') || 'all';
   const [selectedCategory, setSelectedCategory] = useState<string>(initialCategory);
@@ -20,6 +23,13 @@ function ShopContent() {
   const { addToCart, setIsCartOpen, selectedBranch, getProductStockAtBranch } = useCart();
   const [addedId, setAddedId] = useState<string | null>(null);
 
+  // Automatically trigger auth modal if unauthenticated visitor lands on /shop
+  useEffect(() => {
+    if (!authLoading && (!user || user.is_guest)) {
+      openAuthModal('login', '/shop');
+    }
+  }, [authLoading, user, openAuthModal]);
+
   useEffect(() => {
     const cat = searchParams.get('category');
     if (cat) setSelectedCategory(cat);
@@ -28,6 +38,10 @@ function ShopContent() {
   useEffect(() => {
     let active = true;
     async function loadData() {
+      if (!user || user.is_guest) {
+        setLoading(false);
+        return;
+      }
       setLoading(true);
       try {
         const [prodRes, catRes] = await Promise.all([
@@ -57,7 +71,52 @@ function ShopContent() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [user]);
+
+  // If visitor is not signed in, gate product view behind authentication
+  if (!authLoading && (!user || user.is_guest)) {
+    return (
+      <div className="min-h-screen bg-cream text-darktext selection:bg-moss selection:text-cream">
+        <DynamicIslandNavbar />
+        <main className="pt-36 pb-24 px-4 sm:px-8 max-w-2xl mx-auto flex flex-col items-center justify-center min-h-[75vh] text-center space-y-6">
+          <div className="w-20 h-20 rounded-full bg-forest text-cream flex items-center justify-center shadow-elevated">
+            <Lock className="w-9 h-9 text-sage-light" />
+          </div>
+
+          <div className="space-y-3">
+            <span className="text-xs font-semibold uppercase tracking-widest text-moss font-mono">
+              StockSure Member Sanctuary
+            </span>
+            <h1 className="editorial-serif text-3xl sm:text-4xl font-light text-forest">
+              Sign In to Access Catalogue
+            </h1>
+            <p className="text-xs sm:text-sm text-darktext/75 leading-relaxed max-w-md mx-auto">
+              Please sign in to view live specimen pricing, check real-time stock across our Bengaluru greenhouses, and reserve peat-free acclimated plants.
+            </p>
+          </div>
+
+          <div className="flex flex-col sm:flex-row items-center gap-3 pt-2 w-full max-w-xs">
+            <button
+              onClick={() => openAuthModal('login', '/shop')}
+              className="w-full py-3.5 rounded-button bg-forest hover:bg-forest-700 text-cream text-xs font-bold uppercase tracking-wider transition-all shadow-elevated"
+            >
+              Sign In / Register
+            </button>
+            <a
+              href="/backend/auth/google"
+              className="w-full py-3.5 rounded-button bg-white text-darktext border border-forest/20 text-xs font-semibold hover:bg-neutral-50 shadow-xs transition-colors flex items-center justify-center gap-2"
+            >
+              <span>Continue with Google</span>
+            </a>
+          </div>
+
+          <Link href="/" className="text-xs text-forest/70 hover:text-forest underline pt-2">
+            Return to Sanctuary Homepage
+          </Link>
+        </main>
+      </div>
+    );
+  }
 
   const filteredProducts = selectedCategory === 'all'
     ? products

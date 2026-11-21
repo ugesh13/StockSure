@@ -16,7 +16,7 @@ interface AuthContextType {
   loading: boolean;
   isAuthModalOpen: boolean;
   authMode: 'login' | 'register';
-  openAuthModal: (mode?: 'login' | 'register') => void;
+  openAuthModal: (mode?: 'login' | 'register', redirectUrl?: string) => void;
   closeAuthModal: () => void;
   setAuthMode: (mode: 'login' | 'register') => void;
   login: (email: string, password: string) => Promise<{ success: boolean; message?: string }>;
@@ -32,6 +32,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
+  const [redirectAfterAuth, setRedirectAfterAuth] = useState<string | null>(null);
 
   // Check current session from backend on mount
   useEffect(() => {
@@ -67,8 +68,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
-  const openAuthModal = useCallback((mode: 'login' | 'register' = 'login') => {
+  const openAuthModal = useCallback((mode: 'login' | 'register' = 'login', redirectUrl?: string) => {
     setAuthMode(mode);
+    if (redirectUrl) {
+      setRedirectAfterAuth(redirectUrl);
+    }
     setIsAuthModalOpen(true);
   }, []);
 
@@ -91,6 +95,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           email: res.email || email,
         });
         closeAuthModal();
+
+        if (redirectAfterAuth) {
+          const target = redirectAfterAuth;
+          setRedirectAfterAuth(null);
+          if (typeof window !== 'undefined') {
+            window.location.href = target;
+          }
+        }
+
         return { success: true, message: 'Welcome back!' };
       }
       return { success: false, message: 'Login failed' };
@@ -110,6 +123,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           phone,
         });
         closeAuthModal();
+
+        if (redirectAfterAuth) {
+          const target = redirectAfterAuth;
+          setRedirectAfterAuth(null);
+          if (typeof window !== 'undefined') {
+            window.location.href = target;
+          }
+        }
+
         return { success: true, message: 'Account registered successfully!' };
       }
       return { success: false, message: 'Registration failed' };
@@ -126,6 +148,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } finally {
       clearStoredSession();
       setUser(null);
+      // Clean chat storage when user logs out
+      if (typeof window !== 'undefined') {
+        sessionStorage.removeItem('planty_chat_history_v2');
+        localStorage.removeItem('planty_chat_history_v2');
+        // Automatically go to the homepage (the entire starting of the website)
+        window.location.href = '/';
+      }
     }
   };
 

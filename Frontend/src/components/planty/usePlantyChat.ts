@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { backend, adaptProduct, formatImageUrl, Product } from '@/lib/backend';
 import { useCart } from '@/context/CartContext';
+import { useAuth } from '@/context/AuthContext';
 import { ROUTE_MAP, executeNavigation } from './actions';
 import { processBotanicalQuery } from './botanicalBrain';
 
@@ -13,23 +14,12 @@ const STORAGE_KEY = 'planty_chat_history_v2';
 const TEASER_SEEN_KEY = 'planty_teaser_seen_v2';
 
 export function usePlantyChat() {
+  const { user } = useAuth();
   const { selectedBranch, selectedBranchId, addToCart, setIsCartOpen, setIsCheckoutOpen } = useCart();
 
   const [isOpen, setIsOpen] = useState(false);
   const [isTeaserVisible, setIsTeaserVisible] = useState(false);
   const [messages, setMessages] = useState<any[]>(() => {
-    if (typeof window === 'undefined') {
-      return [{ id: 'init-greeting', sender: 'bot', text: GREETING_TEXT, timestamp: Date.now() }];
-    }
-    try {
-      const saved = sessionStorage.getItem(STORAGE_KEY);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed.slice(-30);
-      }
-    } catch {
-      // ignore
-    }
     return [{ id: 'init-greeting', sender: 'bot', text: GREETING_TEXT, timestamp: Date.now() }];
   });
 
@@ -39,14 +29,52 @@ export function usePlantyChat() {
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [viewingProduct, setViewingProduct] = useState<Product | null>(null);
 
-  // Sync to sessionStorage
+  // Authenticated vs Non-Signed In User Chat Memory Management:
+  // Non-signed in user chats MUST NOT be saved and MUST be deleted when opening/interacting with chatbot
   useEffect(() => {
-    try {
-      sessionStorage.setItem(STORAGE_KEY, JSON.stringify(messages.slice(-30)));
-    } catch {
-      // ignore
+    if (!user || user.is_guest) {
+      try {
+        sessionStorage.removeItem(STORAGE_KEY);
+        localStorage.removeItem(STORAGE_KEY);
+      } catch {
+        // ignore
+      }
+      setMessages([{ id: 'init-greeting', sender: 'bot', text: GREETING_TEXT, timestamp: Date.now() }]);
+    } else {
+      try {
+        const userStorageKey = `${STORAGE_KEY}_${user.id}`;
+        const saved = sessionStorage.getItem(userStorageKey);
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setMessages(parsed.slice(-30));
+            return;
+          }
+        }
+      } catch {
+        // ignore
+      }
     }
-  }, [messages]);
+  }, [user]);
+
+  // Sync to sessionStorage ONLY if user is authenticated; wipe if non-signed in
+  useEffect(() => {
+    if (user && !user.is_guest) {
+      try {
+        const userStorageKey = `${STORAGE_KEY}_${user.id}`;
+        sessionStorage.setItem(userStorageKey, JSON.stringify(messages.slice(-30)));
+      } catch {
+        // ignore
+      }
+    } else {
+      try {
+        sessionStorage.removeItem(STORAGE_KEY);
+        localStorage.removeItem(STORAGE_KEY);
+      } catch {
+        // ignore
+      }
+    }
+  }, [messages, user]);
 
   // Teaser timing: trigger after 4s
   useEffect(() => {
@@ -74,10 +102,21 @@ export function usePlantyChat() {
   }, []);
 
   const openChat = useCallback(() => {
+    // If not signed in, ensure any previous/cached chats are deleted and reset
+    if (!user || user.is_guest) {
+      try {
+        sessionStorage.removeItem(STORAGE_KEY);
+        localStorage.removeItem(STORAGE_KEY);
+      } catch {
+        // ignore
+      }
+      setMessages([{ id: 'init-greeting', sender: 'bot', text: GREETING_TEXT, timestamp: Date.now() }]);
+    }
+
     setIsOpen(true);
     setHasUnread(false);
     dismissTeaser();
-  }, [dismissTeaser]);
+  }, [dismissTeaser, user]);
 
   const closeChat = useCallback(() => {
     setIsOpen(false);
