@@ -6,6 +6,7 @@ export interface AuthUser {
   id: string;
   name: string;
   email: string;
+  role?: 'admin' | 'customer';
   createdAt?: string;
 }
 
@@ -68,6 +69,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (data.success && data.user) {
         setUser(data.user);
         closeAuthModal();
+        if (data.user.role === 'admin' || data.redirectTo === '/admin') {
+          window.location.href = '/admin';
+        }
         return { success: true, message: data.message };
       } else {
         return { success: false, message: data.message || 'Login failed' };
@@ -88,6 +92,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (data.success && data.user) {
         setUser(data.user);
         closeAuthModal();
+        if (data.user.role === 'admin' || data.redirectTo === '/admin') {
+          window.location.href = '/admin';
+        }
         return { success: true, message: data.message };
       } else {
         return { success: false, message: data.message || 'Registration failed' };

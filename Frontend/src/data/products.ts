@@ -20,6 +20,11 @@ export interface Product {
   secondaryImageUrl?: string;
   bestseller?: boolean;
   newArrival?: boolean;
+  sku?: string;
+  costPrice?: number;
+  lowStockThreshold?: number;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export const CATEGORIES = [

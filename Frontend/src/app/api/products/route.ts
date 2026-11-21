@@ -46,10 +46,13 @@ export async function GET(req: NextRequest) {
       products.sort((a, b) => (b.bestseller ? 1 : 0) - (a.bestseller ? 1 : 0));
     }
 
+    // Sanitize to prevent exposing shopkeeper-only costPrice to customers
+    const sanitizedProducts = products.map(({ costPrice, ...rest }: any) => rest);
+
     return NextResponse.json({
       success: true,
-      count: products.length,
-      products,
+      count: sanitizedProducts.length,
+      products: sanitizedProducts,
     });
   } catch (error: any) {
     return NextResponse.json(

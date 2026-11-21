@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { X, Lock, Mail, User as UserIcon, AlertCircle, CheckCircle, ArrowRight, Sparkles } from 'lucide-react';
+import { X, Lock, Mail, User as UserIcon, AlertCircle, CheckCircle, ArrowRight, Sparkles, ShieldCheck } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 
 export default function AuthModal() {
@@ -13,6 +13,12 @@ export default function AuthModal() {
   const [errorMessage, setErrorMessage] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleFillAdminUser = () => {
+    setEmail('admin@verdantnursery.com');
+    setPassword('Admin@Verdant2026!');
+    setErrorMessage('');
+  };
 
   if (!isAuthModalOpen) return null;
 
@@ -196,17 +202,31 @@ export default function AuthModal() {
           </button>
         </form>
 
-        {/* Demo Account Quick-Fill Helper */}
+        {/* Demo Account Quick-Fill Helpers */}
         {authMode === 'login' && (
-          <div className="mt-6 pt-4 border-t border-forest/10 text-center">
-            <button
-              type="button"
-              onClick={handleFillDemoUser}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-forest/5 hover:bg-forest/10 text-[11px] font-semibold text-forest border border-forest/10 transition-colors"
-            >
-              <Sparkles className="w-3.5 h-3.5 text-earth" />
-              <span>Fill Demo Account: Elena Vance</span>
-            </button>
+          <div className="mt-6 pt-4 border-t border-forest/10 space-y-2">
+            <div className="text-[10px] font-mono uppercase tracking-wider text-forest/60 text-center">
+              Quick Test Credentials:
+            </div>
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-2">
+              <button
+                type="button"
+                onClick={handleFillAdminUser}
+                className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-full bg-forest text-cream hover:bg-forest-700 text-[11px] font-semibold transition-colors shadow-sm"
+              >
+                <ShieldCheck className="w-3.5 h-3.5 text-sage-light" />
+                <span>Shopkeeper Admin</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleFillDemoUser}
+                className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-full bg-forest/5 hover:bg-forest/10 text-[11px] font-semibold text-forest border border-forest/10 transition-colors"
+              >
+                <Sparkles className="w-3.5 h-3.5 text-earth" />
+                <span>Customer: Elena</span>
+              </button>
+            </div>
           </div>
         )}
       </div>
