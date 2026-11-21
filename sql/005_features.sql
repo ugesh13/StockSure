@@ -54,6 +54,7 @@ CREATE TABLE IF NOT EXISTS deliveries (
   fee_paise integer NOT NULL,
   status text NOT NULL, -- PENDING_PAYMENT, CONFIRMED, PACKED, OUT_FOR_DELIVERY, DELIVERED, FAILED_ATTEMPT, CANCELLED, RETURNED
   handover_code_hash text,
+  handover_code text,
   rider_name text,
   rider_phone text,
   rider_lat numeric(9, 6),
