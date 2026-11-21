@@ -224,7 +224,7 @@ export async function processChatMessage(
   }
 
   // 9. PRODUCT SEARCH / AVAILABILITY
-  if (/\b(find|search|buy|looking for|have|available|stock|show me|price of|catalogue|plant|grocery|electronics)\b/i.test(lower)) {
+  if (/\b(find|search|buy|looking for|have|available|stock|show me|price of|catalogue|plant|plants|sapling|pot)\b/i.test(lower)) {
     const cleanQuery = lower
       .replace(/\b(find|search|buy|looking for|do you have|is there|show me|any|products?|items?|price of)\b/gi, '')
       .trim();

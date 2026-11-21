@@ -1,10 +1,9 @@
-// Generated store layout plan and shelf configuration
-// Date: 2026-11-20
+// Generated store layout plan and shelf configuration for the nursery.
 
 /**
  * Generated store plan. NOTHING here is hard-coded to a number of products or slots:
  * the aisle length (in bays) follows the catalogue. Bay 1.2 m, shelf depth 0.55 m per side,
- * 4 levels at 0.30 / 0.80 / 1.30 / 1.75 m. Ten aisles in two columns of five rows (A to E left, F to J right).
+ * 4 levels at 0.30 / 0.80 / 1.30 / 1.75 m. One aisle per department, in two columns (first half left, rest right).
  */
 import { DEPARTMENTS } from './departments.ts';
 import { modeOf, packKind, preferredLevel, slotWidth, subFamily, type PackKind, type PackRow } from './packs.ts';
@@ -57,11 +56,11 @@ export function tryPlace(rows: PackRow[], bays: number): Placement[] | null {
     const kind = packKind(r);
     const w = slotWidth(r);
     const pref = preferredLevel(r);
-    const levels = kind === 'tvpanel' ? [1] : pref >= 3 ? [pref, pref === 3 ? 4 : 3, 2, 1] : [pref, pref + 1, pref + 2, pref + 3].filter((l) => l <= 4);
+    // Tall saplings (2-ft, 3-ft) only fit on the floor level.
+    const floorOnly = kind === 'sapling2' || kind === 'sapling3';
+    const levels = floorOnly ? [1] : pref >= 3 ? [pref, pref === 3 ? 4 : 3, 2, 1] : [pref, pref + 1, pref + 2, pref + 3].filter((l) => l <= 4);
     let placed = false;
-    for (const level of kind === 'tvpanel' ? [1] : levels) {
-      // TV aisle keeps level 2 empty (panels are tall), small items there go up
-      if (r.category === 'tv' && kind !== 'tvpanel' && level < 3) continue;
+    for (const level of levels) {
       for (const slot of sideOrder) {
         const key = `${level}-${slot}`;
         const u = used.get(key) ?? 0;
@@ -91,20 +90,21 @@ export function planAisle(rows: PackRow[]): { bays: number; placements: Placemen
 /** The whole store from a product list: aisle lengths from product counts, plate size from the aisles. */
 export function generateStore(products: PackRow[]): GeneratedStore {
   const plans = DEPARTMENTS.map((d) => ({ d, ...planAisle(products.filter((p) => p.category === d.category)) }));
-  const leftLen = Math.max(...plans.slice(0, 5).map((p) => p.bays * BAY_W));
+  const perSide = Math.ceil(plans.length / 2);
+  const leftLen = Math.max(...plans.slice(0, perSide).map((p) => p.bays * BAY_W));
   const leftX1 = 3.5 + END_FREE;
   const rightX1 = leftX1 + leftLen + CROSS_AISLE;
   const aisles: AisleGeo[] = plans.map((p, i) => {
-    const row = i % 5;
-    const x1 = i < 5 ? leftX1 : rightX1;
+    const row = i % perSide;
+    const x1 = i < perSide ? leftX1 : rightX1;
     return {
       code: p.d.code, label: p.d.label, category: p.d.category, z: Number((4 + row * ROW_PITCH).toFixed(2)),
       x1, x2: x1 + p.bays * BAY_W, bays: p.bays, placements: p.placements,
     };
   });
-  const rightLen = Math.max(...plans.slice(5).map((p) => p.bays * BAY_W));
+  const rightLen = Math.max(...plans.slice(perSide).map((p) => p.bays * BAY_W), 0);
   const width = Math.ceil(rightX1 + rightLen + END_FREE + 3.5);
-  const lastZ = 4 + 4 * ROW_PITCH;
+  const lastZ = 4 + (perSide - 1) * ROW_PITCH;
   const kioskZ = Math.ceil(lastZ + SHELF_DEPTH + 4.6);
   const depth = kioskZ + 9;
   return {

@@ -8,6 +8,11 @@ import {
   forgotPassword,
   resetPassword,
 } from '../services/auth.ts';
+import {
+  buildGoogleAuthUrl,
+  handleGoogleCallback,
+  exchangeLoginCode,
+} from '../services/googleAuth.ts';
 import { customerOf } from './common.ts';
 import { badInput } from '../errors.ts';
 
@@ -30,6 +35,10 @@ const ForgotBody = z.object({
 const ResetBody = z.object({
   token: z.string().min(32).max(128),
   new_password: z.string().min(8).max(128),
+});
+
+const GoogleExchangeBody = z.object({
+  code: z.string().min(1).max(256),
 });
 
 function getBearerOrHeaderToken(req: FastifyRequest): string | undefined {
@@ -232,6 +241,95 @@ export const authRoutes: FastifyPluginAsync = async (app) => {
       const body = ResetBody.parse(req.body);
       await resetPassword(body.token, body.new_password);
       return reply.status(204).send();
+    },
+  );
+
+  // GET /auth/google
+  app.get(
+    '/auth/google',
+    {
+      ...LIMIT(30),
+      schema: {
+        tags: ['Authentication'],
+        summary: 'Initiate Google OAuth 2.0 PKCE sign-in flow',
+        response: {
+          302: {
+            type: 'null',
+            description: 'Redirect to Google authorization endpoint',
+          },
+        },
+      },
+    },
+    async (_req, reply) => {
+      const authUrl = await buildGoogleAuthUrl();
+      return reply.redirect(authUrl, 302);
+    },
+  );
+
+  // GET /auth/google/callback
+  app.get(
+    '/auth/google/callback',
+    {
+      ...LIMIT(30),
+      schema: {
+        tags: ['Authentication'],
+        summary: 'Google OAuth 2.0 redirect callback',
+        querystring: {
+          type: 'object',
+          properties: {
+            code: { type: 'string' },
+            state: { type: 'string' },
+            error: { type: 'string' },
+          },
+        },
+        response: {
+          302: {
+            type: 'null',
+            description: 'Redirect to frontend callback or login error',
+          },
+        },
+      },
+    },
+    async (req, reply) => {
+      const query = req.query as { code?: string; state?: string; error?: string };
+      const res = await handleGoogleCallback(query);
+      return reply.redirect(res.redirectUrl, 302);
+    },
+  );
+
+  // POST /auth/google/exchange
+  app.post(
+    '/auth/google/exchange',
+    {
+      ...LIMIT(30),
+      schema: {
+        tags: ['Authentication'],
+        summary: 'Exchange one-time Google login code for customer session',
+        body: {
+          type: 'object',
+          required: ['code'],
+          properties: {
+            code: { type: 'string' },
+          },
+        },
+        response: {
+          200: {
+            type: 'object',
+            properties: {
+              customer_id: { type: 'integer' },
+              token: { type: 'string' },
+              name: { type: 'string' },
+              email: { type: 'string', nullable: true },
+            },
+          },
+        },
+      },
+    },
+    async (req, reply) => {
+      const body = GoogleExchangeBody.parse(req.body);
+      const guestToken = getBearerOrHeaderToken(req);
+      const res = await exchangeLoginCode(body.code, guestToken);
+      return reply.status(200).send(res);
     },
   );
 };

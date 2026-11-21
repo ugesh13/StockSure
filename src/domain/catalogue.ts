@@ -11,17 +11,16 @@ export interface CatalogueProduct {
 }
 
 const SYNONYM_GROUPS: string[][] = [
-  ['earbuds', 'earphones', 'headphones', 'earbud', 'earphone', 'headphone', 'tws', 'airpods'],
-  ['mobile', 'phone', 'smartphone'],
-  ['laptop', 'notebook'],
-  ['tv', 'television', 'smart tv'],
-  ['toothpaste', 'paste', 'dant manjan'],
-  ['soap', 'bathing soap', 'sabun'],
-  ['cooking oil', 'oil', 'tel'],
-  ['tea', 'chai'],
-  ['rice', 'chawal'],
-  ['milk', 'doodh'],
-  ['biscuit', 'cookie', 'biscuits', 'cookies'],
+  ['tulsi', 'tulasi', 'holy basil', 'basil'],
+  ['rose', 'gulab', 'rosa'],
+  ['jasmine', 'mogra', 'mallige'],
+  ['aloe', 'aloe vera', 'ghritkumari'],
+  ['curry leaf', 'kadi patta', 'karibevu'],
+  ['snake plant', 'sansevieria', 'saas ki jeebh'],
+  ['hibiscus', 'gudhal', 'dasavala'],
+  ['marigold', 'genda', 'chendu hoovu'],
+  ['sapling', 'seedling', 'plant'],
+  ['pot', 'planter', 'gamla'],
 ];
 
 const SYNONYM_MAP = new Map<string, Set<string>>();

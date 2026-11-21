@@ -37,7 +37,7 @@ npm run migrate
 # 2. Set up Kafka topics (orders, inventory, dlq)
 npm run setup:kafka
 
-# 3. Seed 12 branches, 235 products from catalogue.psv, deterministic stock, and index into OpenSearch
+# 3. Seed 12 branches, the nursery catalogue (53 plants x 3 sizes from data/nursery_plants_seed.csv), stock, the 3D shelf map, and the OpenSearch index
 npm run seed
 
 # 4. Start the API server in terminal 1
@@ -88,6 +88,10 @@ Only variable names are listed. Values must be provided in `.env` (never committ
 - `ZOHO_ORG_ID`: Zoho inventory organization ID
 - `ZOHO_ACCOUNTS_URL`: Zoho accounts auth URL (default `https://accounts.zoho.in`)
 - `ZOHO_API_URL`: Zoho Inventory API base URL (default `https://www.zohoapis.in/inventory/v1`)
+- `GOOGLE_CLIENT_ID`: Google OAuth 2.0 Web Client ID
+- `GOOGLE_CLIENT_SECRET`: Google OAuth 2.0 Client Secret (server-side only, never sent to clients or logged)
+- `GOOGLE_CALLBACK_URL`: Exact redirect URI registered in Google Cloud Console
+- `FRONTEND_URL`: Frontend base URL for OAuth callbacks and redirects (must be listed in `CORS_ORIGINS`)
 
 ## Why every branch shows CONFIRM_WITH_STORE
 

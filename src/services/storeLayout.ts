@@ -16,6 +16,7 @@ import {
   UNIT_DEPTH,
   CROSS_AISLE,
   END_FREE,
+  NURSERY_CATEGORIES,
   type PackRow,
 } from '../domain/layout/index.ts';
 import { getCart } from './cart.ts';
@@ -31,7 +32,7 @@ export async function getBranchLayout(branchId: number) {
   if (!b) throw notFound('Branch');
 
   const pool = getPool();
-  const products = await pool.query<PackRow>('SELECT id, category, brand, name, price_paise FROM products ORDER BY id');
+  const products = await pool.query<PackRow>('SELECT id, category, brand, name, price_paise FROM products WHERE is_active ORDER BY id');
   const store = generateStore(products.rows);
   const a0 = store.aisles[0]!;
 
@@ -87,7 +88,7 @@ export async function getBranchShelves(branchId: number, since?: string) {
       FROM shelf_locations sl
       JOIN products p ON p.id = sl.product_id
       JOIN inventory i ON i.branch_id = sl.branch_id AND i.product_id = sl.product_id
-     WHERE sl.branch_id = $1::int
+     WHERE sl.branch_id = $1::int AND p.is_active
        AND ($2::timestamptz IS NULL OR i.updated_at > $2::timestamptz)
      ORDER BY sl.aisle, sl.bay, sl.level, sl.slot, sl.product_id
   `;
@@ -275,7 +276,7 @@ export interface StaffProductInput {
 }
 
 export async function staffAddProduct(input: StaffProductInput) {
-  const VALID_CATEGORIES = ['audio', 'mobiles', 'computing', 'tv', 'appliances', 'wearables', 'accessories', 'personal_care', 'household', 'grocery'];
+  const VALID_CATEGORIES = NURSERY_CATEGORIES;
   if (!VALID_CATEGORIES.includes(input.category)) {
     throw badInput(`Invalid category "${input.category}". Must be one of: ${VALID_CATEGORIES.join(', ')}`);
   }
@@ -285,7 +286,7 @@ export async function staffAddProduct(input: StaffProductInput) {
 
   const txResult = await withTx(async (c) => {
     // 1. Get all products in this category to calculate appending shelf position
-    const productsRes = await c.query<PackRow>('SELECT id, category, brand, name, price_paise FROM products ORDER BY id');
+    const productsRes = await c.query<PackRow>('SELECT id, category, brand, name, price_paise FROM products WHERE is_active ORDER BY id');
     const existing = productsRes.rows;
     const store = generateStore(existing);
 
@@ -322,16 +323,17 @@ export async function staffAddProduct(input: StaffProductInput) {
     let assignedSlot = 1;
     let assignedX = maxX + w;
 
-    // Aisle index: 0..4 left side, 5..9 right side
+    // Aisle index: first half of the departments on the left side, the rest on the right
+    const perSide = Math.ceil(store.aisles.length / 2);
     const aisleIdx = store.aisles.findIndex((a) => a.code === aisleGeo.code);
-    const isLeftSide = aisleIdx < 5;
+    const isLeftSide = aisleIdx < perSide;
 
     // If new x extends beyond aisle, check clearances
     if (assignedX > aisleGeo.x2) {
       assignedBay = currentBays + 1;
       const newX2 = aisleGeo.x1 + assignedBay * BAY_W;
       if (isLeftSide) {
-        const rightX1 = 3.5 + END_FREE + Math.max(...store.aisles.slice(0, 5).map((p) => p.bays * BAY_W)) + CROSS_AISLE;
+        const rightX1 = 3.5 + END_FREE + Math.max(...store.aisles.slice(0, perSide).map((p) => p.bays * BAY_W)) + CROSS_AISLE;
         if (rightX1 - newX2 < 3.2) {
           throw new AppError(409, 'NO_SPACE', 'Appending product violates walking aisle clearance.');
         }
@@ -349,11 +351,11 @@ export async function staffAddProduct(input: StaffProductInput) {
     const standX = Number(assignedX.toFixed(4));
 
     // Insert Product
-    const sku = `SS-${input.category.slice(0, 3).toUpperCase()}-${Date.now().toString().slice(-6)}`;
+    const sku = `PLANT-STAFF-${Date.now().toString(36).toUpperCase()}`;
     const tags = generateSearchTags(input.category, input.brand, input.name);
     const prodRes = await c.query<{ id: number }>(
-      `INSERT INTO products (sku, name, brand, category, tags, price_paise, price_flag)
-       VALUES ($1, $2, $3, $4, $5, $6, 'i')
+      `INSERT INTO products (sku, name, brand, category, tags, price_paise, price_flag, is_active, is_nursery)
+       VALUES ($1, $2, $3, $4, $5, $6, 'i', true, true)
        RETURNING id`,
       [sku, input.name, input.brand, input.category, tags, input.price_paise],
     );

@@ -146,36 +146,7 @@ export async function loginCustomer(
 
   // If a guest token is provided, merge guest cart into account cart
   if (guestToken) {
-    const gHash = hashToken(guestToken);
-    const gSessionRes = await pool.query<{ customer_id: number }>(
-      'SELECT customer_id FROM sessions WHERE token_hash = $1 AND expires_at > now()',
-      [gHash],
-    );
-    if (gSessionRes.rows.length > 0) {
-      const guestCustId = gSessionRes.rows[0]!.customer_id;
-      if (guestCustId !== customer.id) {
-        await mergeGuestCart(guestCustId, customer.id);
-
-        // Retire guest row only if it has no orders
-        const ordersRes = await pool.query<{ count: string }>(
-          'SELECT count(*)::text as count FROM orders WHERE customer_id = $1',
-          [guestCustId],
-        );
-        const orderCount = parseInt(ordersRes.rows[0]?.count ?? '0', 10);
-        if (orderCount === 0) {
-          await pool.query('DELETE FROM cart_items WHERE cart_id IN (SELECT id FROM carts WHERE customer_id = $1)', [guestCustId]);
-          await pool.query('DELETE FROM carts WHERE customer_id = $1', [guestCustId]);
-          await pool.query('DELETE FROM sessions WHERE customer_id = $1', [guestCustId]);
-          await pool.query('DELETE FROM stock_alerts WHERE customer_id = $1', [guestCustId]);
-          await pool.query('DELETE FROM cart_codes WHERE customer_id = $1', [guestCustId]);
-          await pool.query('DELETE FROM customers WHERE id = $1', [guestCustId]);
-        } else {
-          // Clear guest cart and revoke presented guest session
-          await pool.query('DELETE FROM cart_items WHERE cart_id IN (SELECT id FROM carts WHERE customer_id = $1)', [guestCustId]);
-          await pool.query('DELETE FROM sessions WHERE token_hash = $1', [gHash]);
-        }
-      }
-    }
+    await mergeGuestSession(guestToken, customer.id);
   }
 
   // Generate new session token for the user
@@ -192,6 +163,39 @@ export async function loginCustomer(
     name: customer.name,
     email: customer.email,
   };
+}
+
+export async function mergeGuestSession(guestToken: string, accountCustId: number): Promise<void> {
+  const pool = getPool();
+  const gHash = hashToken(guestToken);
+  const gSessionRes = await pool.query<{ customer_id: number }>(
+    'SELECT customer_id FROM sessions WHERE token_hash = $1 AND expires_at > now()',
+    [gHash],
+  );
+  if (gSessionRes.rows.length === 0) return;
+  const guestCustId = gSessionRes.rows[0]!.customer_id;
+  if (guestCustId === accountCustId) return;
+
+  await mergeGuestCart(guestCustId, accountCustId);
+
+  // Retire guest row only if it has no orders
+  const ordersRes = await pool.query<{ count: string }>(
+    'SELECT count(*)::text as count FROM orders WHERE customer_id = $1',
+    [guestCustId],
+  );
+  const orderCount = parseInt(ordersRes.rows[0]?.count ?? '0', 10);
+  if (orderCount === 0) {
+    await pool.query('DELETE FROM cart_items WHERE cart_id IN (SELECT id FROM carts WHERE customer_id = $1)', [guestCustId]);
+    await pool.query('DELETE FROM carts WHERE customer_id = $1', [guestCustId]);
+    await pool.query('DELETE FROM sessions WHERE customer_id = $1', [guestCustId]);
+    await pool.query('DELETE FROM stock_alerts WHERE customer_id = $1', [guestCustId]);
+    await pool.query('DELETE FROM cart_codes WHERE customer_id = $1', [guestCustId]);
+    await pool.query('DELETE FROM customers WHERE id = $1', [guestCustId]);
+  } else {
+    // Clear guest cart and revoke presented guest session
+    await pool.query('DELETE FROM cart_items WHERE cart_id IN (SELECT id FROM carts WHERE customer_id = $1)', [guestCustId]);
+    await pool.query('DELETE FROM sessions WHERE token_hash = $1', [gHash]);
+  }
 }
 
 async function mergeGuestCart(guestCustId: number, accountCustId: number): Promise<void> {

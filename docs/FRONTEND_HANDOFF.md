@@ -117,6 +117,72 @@ Source of truth: `openapi.json`. Money is always integer **paise** (1 Rupee = 10
 
 ---
 
+### Google Sign-In (Redirect Authorization Code + PKCE Flow)
+
+The Google sign-in flow uses the authorization code grant with PKCE (Proof Key for Code Exchange). **The session token never appears in a URL**.
+
+#### How Frontend Integrates Google Sign-In:
+1. **"Continue with Google" button**: Navigates the browser directly to `{API}/auth/google`:
+   ```javascript
+   window.location.href = `${API_BASE_URL}/auth/google`;
+   ```
+2. **Server 302 Redirect to Google**: The backend creates single-use state, nonce, and PKCE verifier (10-minute TTL in DB) and redirects to Google OAuth consent screen.
+3. **Google Callback**: Google redirects back to `{API}/auth/google/callback?code=...&state=...`.
+4. **Handoff to Frontend**: The backend verifies the ID token against Google's JWKS, links or creates the customer record, creates a single-use 60-second login code, and redirects the browser to:
+   ```
+   {FRONTEND_URL}/auth/callback?code=<code>
+   ```
+   *(If authentication failed or was denied, it redirects to `{FRONTEND_URL}/login?error=google_failed` or `?error=google_denied`).*
+5. **Code Exchange**: On the frontend `/auth/callback` page, extract the `code` parameter from the URL and call `POST /auth/google/exchange`:
+   ```javascript
+   // Include existing guest session if present to merge guest cart into account
+   const res = await fetch(`${API_BASE_URL}/auth/google/exchange`, {
+     method: 'POST',
+     headers: {
+       'Content-Type': 'application/json',
+       'Authorization': guestToken ? `Bearer ${guestToken}` : ''
+     },
+     body: JSON.stringify({ code })
+   });
+   const data = await res.json();
+   // Store data.token and update user state
+   ```
+
+#### Route Details:
+
+#### `GET /auth/google`
+- **Rate Limit**: 30 req/min per IP.
+- **Success (`302 Found`)**: Redirects browser to Google's OAuth 2.0 authorization endpoint (`https://accounts.google.com/o/oauth2/v2/auth`).
+
+#### `GET /auth/google/callback`
+- **Rate Limit**: 30 req/min per IP.
+- **Success (`302 Found`)**: Redirects browser to `{FRONTEND_URL}/auth/callback?code=<code>`.
+- **Failure (`302 Found`)**: Redirects browser to `{FRONTEND_URL}/login?error=google_failed` or `{FRONTEND_URL}/login?error=google_denied` with no secrets or tokens leaked.
+
+#### `POST /auth/google/exchange`
+- **Rate Limit**: 30 req/min per IP.
+- **Request Body**:
+  ```json
+  {
+    "code": "one_time_60s_code"
+  }
+  ```
+- **Optional Header**: `Authorization: Bearer <guest-token>` (automatically merges guest cart into the customer account).
+- **Success (`200 OK`)**:
+  ```json
+  {
+    "customer_id": 42,
+    "token": "sess_01abcdef...",
+    "name": "Arjun Mehta",
+    "email": "arjun@example.com"
+  }
+  ```
+- **Errors**: `400 BAD_INPUT`, `401 BAD_LOGIN_CODE` (if code is reused, expired, or invalid).
+
+---
+
+---
+
 ## 2. Payments (Mock & Razorpay)
 
 ### `POST /orders/:id/payment`
