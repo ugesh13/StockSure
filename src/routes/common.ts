@@ -81,10 +81,44 @@ export function shopperCityOf(req: FastifyRequest): string | null {
   return v && v.length <= 60 ? v : null;
 }
 
+type FailedKeyEntry = { count: number; resetAt: number };
+const failedKeys = new Map<string, FailedKeyEntry>();
+
+export function checkFailedKeyLimit(ip: string): void {
+  const now = Date.now();
+  const entry = failedKeys.get(ip);
+  if (entry) {
+    if (now > entry.resetAt) {
+      failedKeys.delete(ip);
+    } else if (entry.count >= 5) {
+      throw new AppError(429, 'RATE_LIMITED', 'Too many failed key attempts. Slow down a little.');
+    }
+  }
+}
+
+export function recordFailedKey(ip: string): void {
+  const now = Date.now();
+  const entry = failedKeys.get(ip);
+  if (!entry || now > entry.resetAt) {
+    failedKeys.set(ip, { count: 1, resetAt: now + 60_000 });
+  } else {
+    entry.count += 1;
+  }
+}
+
+export function resetFailedKeysForTesting(): void {
+  failedKeys.clear();
+}
+
 function requireKey(name: string, expected: () => string) {
   return async (req: FastifyRequest): Promise<void> => {
+    const ip = req.ip || '127.0.0.1';
+    checkFailedKeyLimit(ip);
     const got = header(req, name);
-    if (!got || !safeEqual(got, expected())) throw new AppError(401, 'UNAUTHORIZED', `Missing or wrong ${name}`);
+    if (!got || !safeEqual(got, expected())) {
+      recordFailedKey(ip);
+      throw new AppError(401, 'UNAUTHORIZED', `Missing or wrong ${name}`);
+    }
   };
 }
 
