@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { backend, adaptProduct, formatImageUrl, Product } from '@/lib/backend';
 import { useCart } from '@/context/CartContext';
 import { ROUTE_MAP, executeNavigation } from './actions';
+import { processBotanicalQuery } from './botanicalBrain';
 
 const GREETING_TEXT =
   'Hello! 🌿 Ask me anything about our plants, care tips, or orders!';
@@ -108,32 +109,30 @@ export function usePlantyChat() {
       const backupInput = text;
 
       try {
-        const data = await backend.sendChatMessage(text, { city: selectedBranch?.city || 'Bengaluru' });
-        let botText = typeof data.reply === 'string' ? data.reply : 'I have received your message.';
+        const rawBackendData = await backend
+          .sendChatMessage(text, { city: selectedBranch?.city || 'Bengaluru' })
+          .catch(() => ({}));
 
+        // Pass through botanical intelligence engine
+        const brainResult = await processBotanicalQuery(
+          text,
+          rawBackendData,
+          selectedBranch?.name || 'Koramangala',
+          selectedBranch?.city || 'Bengaluru'
+        );
+
+        let botText = brainResult.reply;
         const actionPayload: Record<string, any> = {};
-        const action = data.action;
 
-        // Enhanced plant care handler for general queries
-        if (
-          /care tips?|how to care|plant care/i.test(text) &&
-          botText.includes('We do not have curated care notes for that plant yet')
-        ) {
-          botText = `🌿 Here are essential horticultural care tips from StockSure:\n\n• 💧 Watering: Water thoroughly only when the top 2 inches of soil feel dry. Avoid overwatering!\n• ☀️ Sunlight: Most foliage plants thrive best in bright, indirect sunlight.\n• 🌱 Soil & Drainage: Use free-draining, peat-free organic substrate with drainage holes.\n\nTap a plant below for customized care notes:`;
-          const careSuggestions = [
-            'Care for Money plant',
-            'Care for Snake plant',
-            'Care for Peace Lily',
-            'Care for Monstera',
-            'Care for ZZ plant',
-          ];
-          setSuggestions(careSuggestions);
+        if (brainResult.products && brainResult.products.length > 0) {
+          actionPayload.products = brainResult.products;
         }
 
+        const action = brainResult.action || (rawBackendData as any)?.action;
         if (action) {
           const { type, payload } = action;
 
-          if (type === 'show_products') {
+          if (type === 'show_products' && !actionPayload.products) {
             let prods: any[] = payload?.products || [];
             if ((!prods || prods.length === 0) && (payload?.query || text)) {
               try {
@@ -149,17 +148,11 @@ export function usePlantyChat() {
                     category: r.category,
                   }));
                 } else {
-                  // Fallback to general catalogue if specific search returned 0
                   const catalogRes = await backend.getProducts({ pageSize: 6 });
                   prods = catalogRes.products.map(adaptProduct);
                 }
               } catch {
-                try {
-                  const catalogRes = await backend.getProducts({ pageSize: 6 });
-                  prods = catalogRes.products.map(adaptProduct);
-                } catch {
-                  prods = [];
-                }
+                prods = [];
               }
             }
             actionPayload.products = prods.slice(0, 6);
@@ -187,9 +180,8 @@ export function usePlantyChat() {
           }
         }
 
-        if (Array.isArray(data.suggestions)) {
-          setSuggestions(data.suggestions);
-        }
+        // Set rich contextual follow-up suggestions so the user always has prompts to ask more!
+        setSuggestions(brainResult.suggestions);
 
         const botMsg = {
           id: `b-${Date.now()}`,
