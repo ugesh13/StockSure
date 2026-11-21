@@ -32,6 +32,8 @@ export type ProductRow = {
   tags: string[];
   price_paise: number;
   image_url: string | null;
+  image_credit: string | null;
+  image_status: 'ok' | 'needs_review' | 'missing';
 };
 
 export async function listProducts(p: { category?: string; city?: string; page: number; pageSize: number }) {

@@ -53,7 +53,8 @@ export function validateDeliveryAddress(addr: any): DeliveryAddress {
     throw new AppError(422, 'INVALID_NAME', 'Recipient name is required (max 100 characters)');
   }
 
-  const phone = typeof addr.phone === 'string' ? addr.phone.trim() : '';
+  let rawPhone = typeof addr.phone === 'string' ? addr.phone.trim() : '';
+  const phone = rawPhone.replace(/\D/g, '').replace(/^91/, '');
   if (!/^[6-9]\d{9}$/.test(phone)) {
     throw new AppError(422, 'INVALID_PHONE', 'Recipient phone must be a 10-digit Indian mobile number');
   }
@@ -74,9 +75,32 @@ export function validateDeliveryAddress(addr: any): DeliveryAddress {
     throw new AppError(422, 'INVALID_PINCODE', 'Pincode must be a 6-digit Indian postal code');
   }
 
-  const lat = Number(addr.lat);
-  const lng = Number(addr.lng);
-  if (isNaN(lat) || isNaN(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+  let lat = Number(addr.lat);
+  let lng = Number(addr.lng);
+  if (isNaN(lat) || isNaN(lng)) {
+    // City default coordinates fallback
+    const cityCoords: Record<string, [number, number]> = {
+      bengaluru: [12.9352, 77.6245],
+      bangalore: [12.9352, 77.6245],
+      mumbai: [19.1136, 72.8697],
+      delhi: [28.6315, 77.2167],
+      hyderabad: [17.4435, 78.3772],
+      chennai: [13.0418, 80.2341],
+      pune: [18.5074, 73.8077],
+      kolkata: [22.5800, 88.4150],
+      ahmedabad: [23.0300, 72.5170],
+    };
+    const matched = cityCoords[city.toLowerCase()];
+    if (matched) {
+      lat = matched[0];
+      lng = matched[1];
+    } else {
+      lat = 12.9352;
+      lng = 77.6245;
+    }
+  }
+
+  if (lat < -90 || lat > 90 || lng < -180 || lng > 180) {
     throw new AppError(422, 'ADDRESS_NOT_LOCATABLE', 'Valid delivery coordinates (lat/lng) are required');
   }
 

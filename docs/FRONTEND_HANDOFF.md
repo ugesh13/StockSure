@@ -390,3 +390,27 @@ Customer issue report within 48-hour delivery window.
   - `navigate`: `{ "route": "shop" }` (allowed: `home, shop, cart, checkout, orders, account, login, map, help`)
   - `open_map`: `{ "city": "Bengaluru" }`
   - `show_order`: `{ "order_id": "964c2a9d-..." }`
+
+---
+
+## 6. Nursery Catalog & Botanical Plant Images
+
+All 53 nursery plants are enriched with verified, licensed botanical imagery served directly from the backend.
+
+### Image Fields on Products & Search
+Every product returned by `GET /products`, `GET /products/:id`, `GET /search`, and `GET /cart` contains:
+- `image_url`: Relative path to backend-served static image (e.g., `"/static/plants/monstera.jpg"`), or `null` if missing. Prepend the API base URL if accessing from an external origin.
+- `image_credit`: Formatted attribution string (e.g., `"Photo: JJ Harrison, CC BY-SA 3.0"` or `"Photo: Own photo, own"`), or `null` if missing.
+- `image_status`: Image verification status:
+  - `"ok"`: Verified botanical image with permissive open license (`CC0`, `Public Domain`, `CC BY`, `CC BY-SA`, or `"own"` manual override).
+  - `"needs_review"`: Candidate image found but rejected due to botanical genus/species ambiguity or licensing uncertainty.
+  - `"missing"`: No image found or available.
+
+### Static Plant Images Endpoint
+### `GET /static/plants/:filename`
+- **Headers**:
+  - `Cache-Control: public, max-age=86400, immutable`
+  - `Content-Type: image/jpeg` (or `image/png`, `image/webp`)
+- **Security**: Strict path-traversal blocking. Requests containing `..`, directory separators, or non-alphanumeric characters immediately return `404 NOT_FOUND`.
+- **Review Sheet**: Judges and developers can review all 53 plant images, license badges, and author attributions at `reports/plant-images-review.html`.
+

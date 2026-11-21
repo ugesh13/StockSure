@@ -12,6 +12,14 @@ SELECT product_id, branch_id, qty FROM cart_items WHERE cart_id = $1::int ORDER 
 
 export const CART_VIEW_SQL = `
 SELECT ci.product_id, p.name, p.brand, p.price_paise, p.image_url,
+       p.image_status,
+       CASE 
+         WHEN p.image_author IS NOT NULL AND p.image_license IS NOT NULL 
+           THEN 'Photo: ' || p.image_author || ', ' || p.image_license
+         WHEN p.image_author IS NOT NULL 
+           THEN 'Photo: ' || p.image_author
+         ELSE NULL 
+       END AS image_credit,
        ci.branch_id, b.name AS branch_name, b.city, ci.qty,
        GREATEST(i.on_hand - i.reserved - i.buffer, 0)::int AS available
   FROM carts ca
@@ -170,6 +178,14 @@ RETURNING id`;
 // Search document source (indexer) and full rebuild (reindex).
 export const DOC_SOURCE_SQL = `
 SELECT p.id AS product_id, p.sku, p.name, p.brand, p.category, p.tags, p.price_paise, p.image_url,
+       p.image_status,
+       CASE 
+         WHEN p.image_author IS NOT NULL AND p.image_license IS NOT NULL 
+           THEN 'Photo: ' || p.image_author || ', ' || p.image_license
+         WHEN p.image_author IS NOT NULL 
+           THEN 'Photo: ' || p.image_author
+         ELSE NULL 
+       END AS image_credit,
        p.plant_common_name, p.name_hi, p.name_kn, p.scientific_name, p.aliases, p.variant_group, p.variant_size, p.is_active,
        b.id AS branch_id, b.name AS branch_name, b.city
   FROM products p CROSS JOIN branches b
@@ -177,6 +193,14 @@ SELECT p.id AS product_id, p.sku, p.name, p.brand, p.category, p.tags, p.price_p
 
 export const REINDEX_ROWS_SQL = `
 SELECT p.id AS product_id, p.sku, p.name, p.brand, p.category, p.tags, p.price_paise, p.image_url,
+       p.image_status,
+       CASE 
+         WHEN p.image_author IS NOT NULL AND p.image_license IS NOT NULL 
+           THEN 'Photo: ' || p.image_author || ', ' || p.image_license
+         WHEN p.image_author IS NOT NULL 
+           THEN 'Photo: ' || p.image_author
+         ELSE NULL 
+       END AS image_credit,
        p.plant_common_name, p.name_hi, p.name_kn, p.scientific_name, p.aliases, p.variant_group, p.variant_size, p.is_active,
        b.id AS branch_id, b.name AS branch_name, b.city,
        i.on_hand, i.reserved, i.buffer, i.rev
@@ -205,6 +229,14 @@ export const RELAY_FAILED_SQL = `UPDATE outbox SET attempts = attempts + 1 WHERE
 // ---------- catalog ----------
 export const PRODUCTS_LIST_SQL = `
 SELECT p.id, p.sku, p.name, p.brand, p.category, p.tags, p.price_paise, p.image_url,
+       p.image_status,
+       CASE 
+         WHEN p.image_author IS NOT NULL AND p.image_license IS NOT NULL 
+           THEN 'Photo: ' || p.image_author || ', ' || p.image_license
+         WHEN p.image_author IS NOT NULL 
+           THEN 'Photo: ' || p.image_author
+         ELSE NULL 
+       END AS image_credit,
        COALESCE(SUM(GREATEST(x.available, 0)), 0)::int AS available_total
   FROM products p
   LEFT JOIN (
@@ -218,7 +250,17 @@ SELECT p.id, p.sku, p.name, p.brand, p.category, p.tags, p.price_paise, p.image_
  LIMIT $3::int OFFSET $4::int`;
 
 export const PRODUCTS_COUNT_SQL = `SELECT count(*)::int AS n FROM products WHERE is_active = true AND ($1::text IS NULL OR category = $1::text)`;
-export const PRODUCT_SQL = `SELECT id, sku, name, brand, category, tags, price_paise, image_url FROM products WHERE id = $1::int AND is_active = true`;
+export const PRODUCT_SQL = `
+SELECT id, sku, name, brand, category, tags, price_paise, image_url,
+       image_status,
+       CASE 
+         WHEN image_author IS NOT NULL AND image_license IS NOT NULL 
+           THEN 'Photo: ' || image_author || ', ' || image_license
+         WHEN image_author IS NOT NULL 
+           THEN 'Photo: ' || image_author
+         ELSE NULL 
+       END AS image_credit
+  FROM products WHERE id = $1::int AND is_active = true`;
 export const CATEGORIES_SQL = `SELECT category, count(*)::int AS products FROM products WHERE is_active = true GROUP BY category ORDER BY category`;
 export const BRANCHES_SQL = `SELECT id, name, city, lat, lng, last_heartbeat_at FROM branches ORDER BY id`;
 
@@ -250,6 +292,14 @@ SELECT p.id,
 
 export const FALLBACK_BRANCHES_SQL = `
 SELECT p.id AS product_id, p.name, p.brand, p.category, p.price_paise, p.image_url,
+       p.image_status,
+       CASE 
+         WHEN p.image_author IS NOT NULL AND p.image_license IS NOT NULL 
+           THEN 'Photo: ' || p.image_author || ', ' || p.image_license
+         WHEN p.image_author IS NOT NULL 
+           THEN 'Photo: ' || p.image_author
+         ELSE NULL 
+       END AS image_credit,
        i.branch_id, b.name AS branch_name, b.city,
        (i.on_hand - i.reserved - i.buffer)::int AS available
   FROM products p

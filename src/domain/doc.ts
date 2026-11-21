@@ -12,6 +12,8 @@ export type DocSource = {
   tags: string[];
   price_paise: number;
   image_url: string | null;
+  image_credit?: string | null;
+  image_status?: string | null;
   branch_id: number;
   branch_name: string;
   city: string;
@@ -38,6 +40,8 @@ export type SearchDoc = {
   tags: string[];
   price_paise: number;
   image_url: string | null;
+  image_credit?: string | null;
+  image_status?: string | null;
   city: string;
   branch_id: number;
   branch_name: string;
@@ -71,6 +75,8 @@ export function buildDoc(s: DocSource, lowStock: number, updatedAtIso: string): 
     tags: s.tags,
     price_paise: s.price_paise,
     image_url: s.image_url,
+    image_credit: s.image_credit ?? null,
+    image_status: s.image_status ?? null,
     city: s.city,
     branch_id: s.branch_id,
     branch_name: s.branch_name,

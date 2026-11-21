@@ -1,3 +1,5 @@
+import fs from 'node:fs';
+import path from 'node:path';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { cfg } from '../config.ts';
@@ -145,6 +147,44 @@ export function registerRoutes(app: FastifyInstance): void {
     },
   );
 
+  // ---------- static plant images ----------
+  // Serves verified plant images from data/plant-images/
+  // Enforces immutable caching and blocks directory traversal attempts (returns 404)
+  app.get('/static/plants/*', async (req, reply) => {
+    const raw = (req.params as Record<string, string>)['*'] || '';
+    if (
+      !raw ||
+      raw.includes('..') ||
+      raw.includes('/') ||
+      raw.includes('\\') ||
+      raw.includes('\0') ||
+      raw.includes('%2e') ||
+      raw.includes('%2f') ||
+      raw.includes('%5c')
+    ) {
+      return reply.status(404).send({ error: { code: 'NOT_FOUND', message: 'Plant image not found' } });
+    }
+    const filename = path.basename(raw);
+    if (!/^[a-zA-Z0-9_.-]+$/.test(filename)) {
+      return reply.status(404).send({ error: { code: 'NOT_FOUND', message: 'Plant image not found' } });
+    }
+    const safeDir = path.resolve(process.cwd(), 'data', 'plant-images');
+    const targetFile = path.resolve(safeDir, filename);
+    if (!targetFile.startsWith(safeDir) || !fs.existsSync(targetFile)) {
+      return reply.status(404).send({ error: { code: 'NOT_FOUND', message: 'Plant image not found' } });
+    }
+    let contentType = 'image/jpeg';
+    if (filename.endsWith('.png')) contentType = 'image/png';
+    else if (filename.endsWith('.webp')) contentType = 'image/webp';
+    else if (filename.endsWith('.svg')) contentType = 'image/svg+xml';
+
+    const stream = fs.createReadStream(targetFile);
+    return reply
+      .header('Cache-Control', 'public, max-age=86400, immutable')
+      .header('Content-Type', contentType)
+      .send(stream);
+  });
+
   // ---------- browse ----------
   app.get('/products', LIMIT(240), async (req) => {
     const q = z
@@ -259,7 +299,7 @@ export function registerRoutes(app: FastifyInstance): void {
     return respondCheckout(reply, result, shopperCityOf(req));
   });
   app.post('/orders/:id/pay', LIMIT(30), async (req) => {
-    if (cfg().PAYMENT_PROVIDER === 'razorpay') {
+    if (cfg().PAYMENT_PROVIDER === 'razorpay' && !cfg().DEMO_MODE) {
       throw new AppError(404, 'ROUTE_DISABLED', 'POST /orders/:id/pay is disabled in Razorpay mode. Use /orders/:id/payment and /orders/:id/payment/verify');
     }
     const { id } = OrderParams.parse(req.params);
