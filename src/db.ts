@@ -13,6 +13,11 @@ export type Db = Pick<pg.Pool, 'query'>;
 
 let pool: pg.Pool | undefined;
 
+/** For unit testing without a live database. */
+export function _setPoolForTesting(p: any): void {
+  pool = p;
+}
+
 function sslOption(): false | ConnectionOptions {
   const c = cfg();
   if (c.PG_SSL === 'off') return false;

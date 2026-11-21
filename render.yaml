@@ -30,7 +30,7 @@ services:
       - key: ADMIN_TOKEN
         sync: false
       - key: DEMO_MODE
-        value: "true"
+        value: "false"
 
   - type: worker
     name: stocksure-worker

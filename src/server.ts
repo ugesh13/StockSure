@@ -33,6 +33,11 @@ try {
   const sweeper = cfg().RUN_SWEEPER ? startSweeper() : null;
   log('info', 'api started', { port: cfg().PORT, relay: Boolean(relay), sweeper: Boolean(sweeper) });
 
+  const isProd = process.env.NODE_ENV === 'production' || cfg().NODE_ENV === 'production';
+  if (isProd && (process.env.DEMO_MODE === 'true' || cfg().DEMO_MODE)) {
+    log('warn', 'DEMO_MODE=true is enabled in production; /demo/* routes are open');
+  }
+
   let closing = false;
   const shutdown = async (signal: string) => {
     if (closing) return;

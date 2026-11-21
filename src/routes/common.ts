@@ -53,8 +53,9 @@ export async function customerOf(req: FastifyRequest): Promise<number> {
     return session.customer_id;
   }
 
-  // Without a session token, only demo customers 1 to 20 are allowed, and ONLY when DEMO_MODE=true
-  if (isDemoMode() && raw !== undefined) {
+  // Without a session token, only demo customers 1 to 20 are allowed, and ONLY when DEMO_MODE=true and NODE_ENV !== 'production'
+  const isProd = process.env.NODE_ENV === 'production' || (cfg().NODE_ENV === 'production');
+  if (!isProd && isDemoMode() && raw !== undefined) {
     const n = Number(raw);
     if (Number.isInteger(n) && n >= 1 && n <= DEMO_CUSTOMER_MAX) {
       return n;
