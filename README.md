@@ -3,6 +3,21 @@
 Backend for StockSure (team DEV BYTES), branch-accurate inventory on Aiven PostgreSQL, Kafka and OpenSearch.
 Node 22.18+, TypeScript run natively (no build step), Fastify 5.
 
+Search is a hint, checkout is a guarantee.
+
+## Architecture
+
+```mermaid
+flowchart LR
+    API[Fastify API] -->|Guarded Reserve| PG[(PostgreSQL)]
+    PG -->|Outbox Table| Relay[Outbox Relay]
+    Relay -->|Publish Events| KFK{{Aiven Kafka}}
+    KFK -->|Consume| Cons[Inventory Consumers]
+    Cons -->|Async Index| OS[(OpenSearch)]
+```
+
+The API guarantees zero overselling by executing atomic guarded reserve transactions in PostgreSQL (`on_hand - reserved - buffer >= qty`). Order events are captured via transactional outbox, published by the outbox relay to Kafka, and processed asynchronously by background consumers to synchronize OpenSearch, emit alerts, and finalize stock.
+
 ## What each Aiven service does
 
 | Service | Real job |
@@ -11,7 +26,7 @@ Node 22.18+, TypeScript run natively (no build step), Fastify 5.
 | Kafka | `orders`, `inventory`, `dlq` topics. Order events finalize stock, send notifications, update search and fire back-in-stock alerts. |
 | OpenSearch | Fuzzy search with synonyms, filters, one document per product per branch. Falls back to Postgres `pg_trgm` if it is slow or down. |
 
-## Run Order (on your machine)
+## Run in 5 steps
 
 Run these commands in order:
 
@@ -98,6 +113,12 @@ When a branch's last heartbeat is older than 60 seconds (or has never checked in
 
 - **Delivery**: There is no courier integration, dispatch dispatching, or automated inter-branch transfers. `DELIVERY` exists purely as a fulfilment flag on orders and checkout.
 - **Zoho Inventory**: The Zoho adapter is fully implemented with OAuth refresh, retry on 401, and simulated fallback, but is not verified against a live Zoho production account.
+
+## Known limits
+
+- **Search Latency & Index Lag**: OpenSearch indexing is asynchronous via Kafka consumer. Search queries reflect eventual consistency (~1-2 seconds after outbox relay).
+- **Branch Heartbeat Window**: Branches without POS heartbeat within 60 seconds transition to `CONFIRM_WITH_STORE` status.
+- **Single Outbox Relay Process**: Only one process should run `RUN_RELAY=true` to prevent duplicate polling overhead.
 
 ## API Endpoints (all JSON)
 
