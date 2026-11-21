@@ -26,6 +26,7 @@
     "demo:up": "node --env-file-if-exists=.env scripts/demo-up.ts",
     "demo:reset": "node --env-file-if-exists=.env scripts/demo-reset.ts",
     "demo:fixture": "node --env-file-if-exists=.env scripts/demo-fixture.ts",
+    "judge-demo": "node --env-file-if-exists=.env scripts/judge-demo.ts",
     "pos-sim": "node --env-file-if-exists=.env scripts/pos-simulator.ts",
     "bad-event": "node --env-file-if-exists=.env scripts/bad-event.ts",
     "typecheck": "tsc --noEmit",
