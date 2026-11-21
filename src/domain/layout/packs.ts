@@ -1,4 +1,4 @@
-// Copied verbatim from C:\Users\ugesh\Desktop\College\Hackathon\Avishkar\MemGuard-AI-Foundation\stocksure-frontend\src\data\packs.ts
+// Pack models and shelf packaging specifications
 // Date: 2026-11-20
 
 /** Pack models, display scale, brand colours and shelf-level rules. Pure data: shared by the planner, the 3D scene and the tests. */

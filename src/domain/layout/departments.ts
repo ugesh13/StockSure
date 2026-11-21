@@ -1,4 +1,4 @@
-// Copied from C:\Users\ugesh\Desktop\College\Hackathon\Avishkar\MemGuard-AI-Foundation\stocksure-frontend\src\data\catalogue.ts
+// Store department definitions and category mappings
 // Date: 2026-11-20
 
 export const DEPARTMENTS = [

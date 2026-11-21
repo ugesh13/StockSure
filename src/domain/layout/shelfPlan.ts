@@ -1,4 +1,4 @@
-// Copied verbatim from C:\Users\ugesh\Desktop\College\Hackathon\Avishkar\MemGuard-AI-Foundation\stocksure-frontend\src\data\shelfPlan.ts
+// Generated store layout plan and shelf configuration
 // Date: 2026-11-20
 
 /**
