@@ -30,8 +30,10 @@ CREATE TABLE IF NOT EXISTS payments (
   method text,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now(),
+  expires_at timestamptz,
   CONSTRAINT uq_payments_provider_payment_id UNIQUE (provider, provider_payment_id)
 );
+ALTER TABLE payments ADD COLUMN IF NOT EXISTS expires_at timestamptz;
 CREATE INDEX IF NOT EXISTS idx_payments_order_id ON payments (order_id);
 CREATE INDEX IF NOT EXISTS idx_payments_provider_order_id ON payments (provider_order_id);
 

@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
+import { cfg } from '../config.ts';
 import { getHealth } from '../services/health.ts';
 import { getPool, pingPg, withTx } from '../db.ts';
 import { replayDlq } from '../kafka/dlq.ts';
@@ -22,6 +23,7 @@ import { syncInventoryWithZoho } from '../integrations/zoho.ts';
 import { IdSchema, UuidSchema, customerOf, idempotencyKeyOf, requireAdmin, requireDemoOrStaff, requireStaff, respondCheckout, shopperCityOf } from './common.ts';
 import { createSession, deleteCustomerAccount } from '../services/session.ts';
 import { authRoutes } from './auth.ts';
+import { paymentRoutes } from './payments.ts';
 import {
   addProductRequest,
   getProductRequests,
@@ -84,6 +86,7 @@ async function check(fn: () => Promise<Record<string, unknown>>): Promise<Record
 export function registerRoutes(app: FastifyInstance): void {
   // ---------- auth ----------
   app.register(authRoutes);
+  app.register(paymentRoutes);
 
   // ---------- health ----------
   app.get('/health', async (_req, reply) => {
@@ -217,6 +220,9 @@ export function registerRoutes(app: FastifyInstance): void {
     return respondCheckout(reply, result, shopperCityOf(req));
   });
   app.post('/orders/:id/pay', LIMIT(30), async (req) => {
+    if (cfg().PAYMENT_PROVIDER === 'razorpay') {
+      throw new AppError(404, 'ROUTE_DISABLED', 'POST /orders/:id/pay is disabled in Razorpay mode. Use /orders/:id/payment and /orders/:id/payment/verify');
+    }
     const { id } = OrderParams.parse(req.params);
     const customerId = await customerOf(req);
     const r = await payOrder(customerId, id);
