@@ -82,6 +82,8 @@ When a branch's last heartbeat is older than 60 seconds (or has never checked in
 
 ## Checks
 
+> **CI Note**: `npm run test:db` and `npm run race-test` need real Aiven credentials and write to the real database; they are never run in CI. Continuous integration strictly runs zero-secret checks (`npm run typecheck` and `npm run test:unit`).
+
 | Command | What it proves |
 |---|---|
 | `npm test` | Pure rules: availability, status, freshness, split plan, search body, event schemas, config errors, catalogue validation, session token hashing, cart codes, `since` filtering, kiosk branch matching. |
