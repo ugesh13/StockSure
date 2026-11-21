@@ -279,7 +279,7 @@ export async function sweepOnce(max = 50): Promise<number> {
       const id = next.rows[0]?.id;
       if (!id) return false;
       const released = await releaseHold(c, id, 'EXPIRED');
-      if (released) {
+      if (released && released.lines.length > 0) {
         await enqueue(c, 'orders', id, 'order.expired', { order_id: id, customer_id: released.customerId, lines: released.lines });
       }
       return true;
