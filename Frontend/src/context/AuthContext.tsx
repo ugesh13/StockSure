@@ -9,6 +9,8 @@ export interface AuthUser {
   email: string;
   phone?: string | null;
   is_guest?: boolean;
+  role?: 'admin' | 'customer';
+  createdAt?: string;
 }
 
 interface AuthContextType {
@@ -89,14 +91,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const res = await backend.login({ email, password });
       if (res && res.token) {
+        const userRole = (res as any).role;
         setUser({
           id: res.customer_id,
           name: res.name,
           email: res.email || email,
+          role: userRole,
         });
         closeAuthModal();
 
-        if (redirectAfterAuth) {
+        if (userRole === 'admin' || (res as any).redirectTo === '/admin') {
+          if (typeof window !== 'undefined') {
+            window.location.href = '/admin';
+          }
+        } else if (redirectAfterAuth) {
           const target = redirectAfterAuth;
           setRedirectAfterAuth(null);
           if (typeof window !== 'undefined') {
@@ -116,15 +124,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const res = await backend.register({ name, email, password, phone });
       if (res && res.token) {
+        const userRole = (res as any).role;
         setUser({
           id: res.customer_id,
           name: res.name,
           email: res.email || email,
           phone,
+          role: userRole,
         });
         closeAuthModal();
 
-        if (redirectAfterAuth) {
+        if (userRole === 'admin' || (res as any).redirectTo === '/admin') {
+          if (typeof window !== 'undefined') {
+            window.location.href = '/admin';
+          }
+        } else if (redirectAfterAuth) {
           const target = redirectAfterAuth;
           setRedirectAfterAuth(null);
           if (typeof window !== 'undefined') {

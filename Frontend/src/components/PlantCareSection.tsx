@@ -25,7 +25,7 @@ export default function PlantCareSection() {
         'Use room-temperature filtered or rested tap water to avoid shocking tender root hairs.',
       ],
       ruleOfThumb: 'When in doubt, wait 48 hours. Plants recover far swifter from thirst than root asphyxiation.',
-      imageUrl: 'https://images.unsplash.com/photo-1596724855541-0f4955c468e2?auto=format&fit=crop&w=800&q=80',
+      imageUrl: '/plants/peace-lily.jpg',
     },
     {
       id: 'sunlight' as const,
@@ -42,7 +42,7 @@ export default function PlantCareSection() {
         'Rotate pots 90 degrees every fortnight to maintain balanced, symmetrical architecture.',
       ],
       ruleOfThumb: 'Hold your hand 12 inches above a piece of white paper. A soft, fuzzy shadow signifies ideal bright indirect light.',
-      imageUrl: 'https://images.unsplash.com/photo-1512428813834-c702c7702b78?auto=format&fit=crop&w=800&q=80',
+      imageUrl: '/plants/areca-palm.jpg',
     },
     {
       id: 'soil' as const,
@@ -59,7 +59,7 @@ export default function PlantCareSection() {
         'Repot only when roots begin coiling out of lower drainage holes, typically every 18-24 months.',
       ],
       ruleOfThumb: 'Water should pass through your soil and begin dripping out the bottom within 15 seconds.',
-      imageUrl: 'https://images.unsplash.com/photo-1585320806297-9794b3e4eeae?auto=format&fit=crop&w=800&q=80',
+      imageUrl: '/plants/aloe-vera.jpg',
     },
     {
       id: 'placement' as const,
@@ -76,7 +76,7 @@ export default function PlantCareSection() {
         'Group plants together in clusters to create natural collective humidity microclimates.',
       ],
       ruleOfThumb: 'If you feel chilly or scorched in a spot, your tropical plant feels twice as vulnerable.',
-      imageUrl: 'https://images.unsplash.com/photo-1545241047-6083a3684587?auto=format&fit=crop&w=800&q=80',
+      imageUrl: '/plants/monstera.jpg',
     },
     {
       id: 'beginner' as const,
@@ -93,7 +93,7 @@ export default function PlantCareSection() {
         'Golden Pothos (Epipremnum): Fast-growing cascading vine that alerts you visually when thirsty.',
       ],
       ruleOfThumb: 'Start with 2-3 forgiving specimens before venturing into delicate epiphytes or rare variegated aroids.',
-      imageUrl: 'https://images.unsplash.com/photo-1593482892290-f54927ae1eb6?auto=format&fit=crop&w=800&q=80',
+      imageUrl: '/plants/snake-plant.jpg',
     },
   ];
 

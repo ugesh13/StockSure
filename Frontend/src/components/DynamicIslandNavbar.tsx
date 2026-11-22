@@ -22,7 +22,7 @@ import { getStoredToken } from '@/lib/backend';
 
 export default function DynamicIslandNavbar() {
   const pathname = usePathname() || '/';
-  const { user, loading, logout } = useAuth();
+  const { user, loading, logout, isAuthModalOpen } = useAuth();
   const { cartCount, setIsCartOpen } = useCart();
 
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -66,7 +66,7 @@ export default function DynamicIslandNavbar() {
   // Scroll Progress Tracking via Framer Motion
   const { scrollY } = useScroll();
 
-  const maxWidthRaw = useTransform(scrollY, [0, 420], [720, 1180]);
+  const maxWidthRaw = useTransform(scrollY, [0, 420], [1040, 1180]);
   const scaleRaw = useTransform(scrollY, [0, 420], [1, 1.025]);
   const linkGapRaw = useTransform(scrollY, [0, 420], [8, 36]);
   const linkPaddingXRaw = useTransform(scrollY, [0, 420], [12, 20]);
@@ -131,6 +131,11 @@ export default function DynamicIslandNavbar() {
   const isOrdersActive = pathname === '/profile';
   const isCareActive = pathname === '/plant-care' || (pathname === '/' && activeSection === ('care' as any));
 
+  // Auth screens must be distraction-free: no navbar on /login, /register or while the auth modal is open
+  if (pathname === '/login' || pathname === '/register' || pathname.startsWith('/auth') || isAuthModalOpen) {
+    return null;
+  }
+
   return (
     <header className="fixed top-5 left-0 right-0 z-[100] flex justify-center px-4 pointer-events-none">
       <motion.div
@@ -143,7 +148,7 @@ export default function DynamicIslandNavbar() {
           } bg-[#121E17]/75 hover:bg-[#121E17]/85 backdrop-blur-2xl border border-white/20 hover:border-white/30 shadow-[0_16px_40px_rgba(0,0,0,0.35),0_4px_16px_rgba(0,0,0,0.2)] ring-1 ring-white/10 transition-colors duration-300 flex flex-col justify-center`}
       >
         {/* Main Navigation Bar */}
-        <div className="flex items-center justify-between py-2.5 px-4 sm:px-6">
+        <div className="flex items-center justify-between gap-2 py-2.5 px-4 sm:px-6 min-w-0">
           {/* Logo -> Links to / */}
           <div className="flex items-center flex-shrink-0">
             <Link
@@ -164,13 +169,13 @@ export default function DynamicIslandNavbar() {
               </span>
             </Link>
 
-            <span className="hidden md:block h-5 w-[1.5px] bg-white/35 ml-2 sm:ml-3 rounded-full" aria-hidden="true" />
+            <span className="hidden lg:block h-5 w-[1.5px] bg-white/35 ml-2 sm:ml-3 rounded-full" aria-hidden="true" />
           </div>
 
           {/* Desktop Navigation Links */}
           <motion.nav
             style={{ gap: smoothLinkGap }}
-            className="hidden md:flex items-center justify-center flex-1 mx-2 sm:mx-4 text-xs lg:text-sm font-medium whitespace-nowrap"
+            className="hidden lg:flex items-center justify-center flex-1 mx-2 sm:mx-4 text-xs lg:text-sm font-medium whitespace-nowrap"
           >
             {isEffectivelySignedIn ? (
               /* ================= SIGNED IN: EXACTLY Home, Shop, My Orders, Plant Care ================= */
@@ -268,12 +273,12 @@ export default function DynamicIslandNavbar() {
           </motion.nav>
 
           {/* Right Controls: Cart, Primary Button & User Menu */}
-          <div className="hidden md:flex items-center gap-2.5 flex-shrink-0">
+          <div className="hidden lg:flex items-center gap-2.5 flex-shrink-0">
             {/* Signed-Out Home Page: Shop Now Primary Button */}
             {!isEffectivelySignedIn && pathname === '/' && (
               <Link
                 href="/shop"
-                className="flex items-center gap-1.5 py-1.5 px-4 rounded-full bg-moss hover:bg-moss-700 text-cream font-bold text-xs uppercase tracking-wider transition-all duration-300 shadow-sm hover:shadow-elevated border border-white/15"
+                className="flex items-center gap-1.5 py-1.5 px-4 rounded-full whitespace-nowrap bg-moss hover:bg-moss-700 text-cream font-bold text-xs uppercase tracking-wider transition-all duration-300 shadow-sm hover:shadow-elevated border border-white/15"
               >
                 <span>Shop Now</span>
                 <ArrowRight className="w-3.5 h-3.5" />
@@ -367,16 +372,16 @@ export default function DynamicIslandNavbar() {
             ) : (
               <Link
                 href="/login"
-                className="flex items-center gap-1.5 py-1.5 px-4 rounded-full bg-moss hover:bg-moss-700 text-white text-xs font-bold transition-all duration-300 shadow-xs border border-white/10"
+                className="flex items-center gap-1.5 py-1.5 px-4 rounded-full whitespace-nowrap bg-moss hover:bg-moss-700 text-white text-xs font-bold transition-all duration-300 shadow-xs border border-white/10"
               >
                 <User className="w-3.5 h-3.5 text-white" />
-                <span>Sign In / Register</span>
+                <span>Sign In</span>
               </Link>
             )}
           </div>
 
           {/* Mobile Right Controls: Cart & Menu Toggle */}
-          <div className="flex items-center gap-1.5 md:hidden">
+          <div className="flex items-center gap-1.5 lg:hidden">
             {isEffectivelySignedIn && (
               <button
                 type="button"
@@ -406,7 +411,7 @@ export default function DynamicIslandNavbar() {
 
         {/* Mobile Expanded Menu */}
         {mobileMenuOpen && (
-          <div className="px-4 pb-4 pt-2 border-t border-white/15 md:hidden animate-fade-in space-y-2">
+          <div className="px-4 pb-4 pt-2 border-t border-white/15 lg:hidden animate-fade-in space-y-2">
             <nav className="flex flex-col gap-1 text-sm font-medium">
               {isEffectivelySignedIn ? (
                 /* Mobile Signed-In Links */
@@ -506,7 +511,7 @@ export default function DynamicIslandNavbar() {
                     className="w-full text-left py-2 px-3 rounded-[14px] transition-colors bg-white/10 text-white font-bold flex items-center gap-2"
                   >
                     <User className="w-4 h-4" />
-                    <span>Sign In / Register</span>
+                    <span>Sign In</span>
                   </Link>
                 </>
               )}

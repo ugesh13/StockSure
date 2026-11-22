@@ -21,7 +21,9 @@ export default function GlobalCartAndModals() {
         isOpen={isCheckoutOpen}
         onClose={() => setIsCheckoutOpen(false)}
         onOrderSuccess={(order) => {
-          console.log('Order completed:', order.id);
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent('stocksure:orders-changed', { detail: { id: order.id } }));
+          }
         }}
       />
       <AuthModal />

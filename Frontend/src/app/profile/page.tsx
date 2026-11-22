@@ -40,6 +40,13 @@ import {
 
 type TabType = 'orders' | 'profile' | 'addresses' | 'preferences' | 'security';
 
+// Latest order first: sort by created_at descending
+function sortNewestFirst<T extends { created_at?: string }>(list: T[]): T[] {
+  return [...list].sort(
+    (a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()
+  );
+}
+
 export default function ProfilePage() {
   return (
     <React.Suspense fallback={<div className="min-h-screen bg-cream flex items-center justify-center text-forest text-xs font-semibold">Loading botanical profile...</div>}>
@@ -138,7 +145,7 @@ function ProfileContent() {
       try {
         const res = await backend.getOrders(20);
         if (active && res && res.orders) {
-          setOrders(res.orders);
+          setOrders(sortNewestFirst(res.orders));
         }
       } catch (err) {
         console.error('Failed to load real customer orders', err);
@@ -147,8 +154,17 @@ function ProfileContent() {
       }
     }
     fetchOrders();
+    // Refresh when a new order is placed anywhere in the app, or when the tab regains focus
+    const onChanged = () => fetchOrders();
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') fetchOrders();
+    };
+    window.addEventListener('stocksure:orders-changed', onChanged);
+    document.addEventListener('visibilitychange', onVisible);
     return () => {
       active = false;
+      window.removeEventListener('stocksure:orders-changed', onChanged);
+      document.removeEventListener('visibilitychange', onVisible);
     };
   }, [user]);
 
@@ -171,7 +187,7 @@ function ProfileContent() {
     try {
       await backend.cancelOrder(orderId);
       const res = await backend.getOrders(20);
-      if (res.orders) setOrders(res.orders);
+      if (res.orders) setOrders(sortNewestFirst(res.orders));
     } catch (err: any) {
       alert(err.message || 'Failed to cancel order.');
     } finally {
