@@ -88,10 +88,44 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const login = async (email: string, password: string) => {
+    const cleanEmail = (email || '').trim().toLowerCase();
+    const cleanPassword = (password || '').trim();
+
+    // 1. If designated shopkeeper admin, authenticate via local Next.js API
+    if (cleanEmail === 'admin@verdantnursery.com') {
+      try {
+        const localRes = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: cleanEmail, password: cleanPassword }),
+        });
+        const localData = await localRes.json();
+        if (localRes.ok && localData.success && localData.user) {
+          const adminUser: AuthUser = {
+            id: localData.user.id,
+            name: localData.user.name,
+            email: localData.user.email,
+            role: 'admin',
+          };
+          setUser(adminUser);
+          closeAuthModal();
+          if (typeof window !== 'undefined') {
+            window.location.href = '/admin';
+          }
+          return { success: true, message: 'Welcome back, Administrator!' };
+        } else {
+          return { success: false, message: localData.message || 'Invalid email or password' };
+        }
+      } catch (err: any) {
+        return { success: false, message: err.message || 'Unable to authenticate admin' };
+      }
+    }
+
+    // 2. Otherwise authenticate customer via backend API
     try {
       const res = await backend.login({ email, password });
       if (res && res.token) {
-        const userRole = (res as any).role;
+        const userRole = (res as any).role || 'customer';
         setUser({
           id: res.customer_id,
           name: res.name,
@@ -116,6 +150,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
       return { success: false, message: 'Login failed' };
     } catch (err: any) {
+      // Fallback to local auth if backend call fails
+      try {
+        const fallbackRes = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password }),
+        });
+        const fallbackData = await fallbackRes.json();
+        if (fallbackRes.ok && fallbackData.success && fallbackData.user) {
+          setUser(fallbackData.user);
+          closeAuthModal();
+          if (fallbackData.user.role === 'admin' || fallbackData.redirectTo === '/admin') {
+            if (typeof window !== 'undefined') {
+              window.location.href = '/admin';
+            }
+          }
+          return { success: true, message: fallbackData.message || 'Welcome back!' };
+        }
+      } catch {
+        // ignore
+      }
       return { success: false, message: err.message || 'Invalid email or password' };
     }
   };
