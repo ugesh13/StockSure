@@ -2,8 +2,8 @@
 
 import React from 'react';
 import Image from 'next/image';
-import { Eye, ShoppingBag, Star, Check } from 'lucide-react';
-import { Product } from '@/data/products';
+import { Eye, ShoppingBag, Star } from 'lucide-react';
+import { Product, formatImageUrl } from '@/lib/backend';
 import { useCart } from '@/context/CartContext';
 
 interface BestSellersProps {
@@ -47,7 +47,7 @@ export default function BestSellers({ products, onQuickView, onExploreAll }: Bes
             {/* Image Container with rounded-product [24px] */}
             <div className="relative h-72 w-full rounded-[20px] overflow-hidden bg-cream-dark/40 mb-4">
               <Image
-                src={product.imageUrl}
+                src={formatImageUrl(product.imageUrl)}
                 alt={product.name}
                 fill
                 sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 25vw"
@@ -121,10 +121,10 @@ export default function BestSellers({ products, onQuickView, onExploreAll }: Bes
               {/* Price & Add to Cart button */}
               <div className="flex items-center justify-between pt-3 mt-1">
                 <div className="flex items-baseline gap-2">
-                  <span className="font-serif text-xl font-bold text-forest">${product.price}</span>
+                  <span className="font-serif text-xl font-bold text-forest">₹{product.price}</span>
                   {product.originalPrice && (
                     <span className="text-xs text-darktext/40 line-through">
-                      ${product.originalPrice}
+                      ₹{product.originalPrice}
                     </span>
                   )}
                 </div>

@@ -38,12 +38,12 @@ export async function POST(req: NextRequest) {
 
     const response = NextResponse.json({
       success: true,
-      message: 'Welcome to Verdant! Account created successfully.',
+      message: 'Welcome to StockSure! Account created successfully.',
       user: safeUser,
       token: `tok_${user.id}_${Date.now()}`,
     });
 
-    response.cookies.set('verdant_session', safeUser.id, {
+    response.cookies.set('stocksure_session', safeUser.id, {
       httpOnly: false,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',

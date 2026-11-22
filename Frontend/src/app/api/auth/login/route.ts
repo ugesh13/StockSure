@@ -38,7 +38,7 @@ export async function POST(req: NextRequest) {
       token: `tok_${user.id}_${Date.now()}`,
     });
 
-    response.cookies.set('verdant_session', safeUser.id, {
+    response.cookies.set('stocksure_session', safeUser.id, {
       httpOnly: false,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',

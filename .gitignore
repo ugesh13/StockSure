@@ -15,3 +15,6 @@ _parked_not_for_git/
 *.dmg
 test-results/
 
+
+# editor backups
+*.bak

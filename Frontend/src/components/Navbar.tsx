@@ -1,35 +1,46 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import {
   ShoppingBag,
-  Search,
   User as UserIcon,
   Menu,
   X,
   Sprout,
   ChevronDown,
   LogOut,
-  Sparkles,
+  Package,
+  UserCheck,
+  ArrowRight,
 } from 'lucide-react';
 import { useCart } from '@/context/CartContext';
 import { useAuth } from '@/context/AuthContext';
-import { CATEGORIES } from '@/data/products';
+import { getStoredToken } from '@/lib/backend';
 
-interface NavbarProps {
-  onSelectCategory: (categoryId: string) => void;
-  onOpenSearch: () => void;
-  onOpenQuiz: () => void;
-}
-
-export default function Navbar({ onSelectCategory, onOpenSearch, onOpenQuiz }: NavbarProps) {
+export default function Navbar() {
+  const pathname = usePathname() || '/';
   const [scrolled, setScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [categoriesDropdownOpen, setCategoriesDropdownOpen] = useState(false);
   const [userDropdownOpen, setUserDropdownOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
 
   const { cartCount, setIsCartOpen } = useCart();
-  const { user, openAuthModal, logout } = useAuth();
+  const { user, loading, logout } = useAuth();
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  const [hasStoredToken, setHasStoredToken] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      return Boolean(getStoredToken());
+    }
+    return false;
+  });
+
+  useEffect(() => {
+    setMounted(true);
+    setHasStoredToken(Boolean(getStoredToken()));
+  }, []);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -39,201 +50,152 @@ export default function Navbar({ onSelectCategory, onOpenSearch, onOpenQuiz }: N
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  const handleCategoryClick = (catId: string) => {
-    onSelectCategory(catId);
-    setCategoriesDropdownOpen(false);
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setUserDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const isUserLoggedIn = Boolean(user && !user.is_guest);
+  const isEffectivelySignedIn = isUserLoggedIn || (mounted && hasStoredToken);
+
+  const handleLogout = async () => {
+    setUserDropdownOpen(false);
     setMobileMenuOpen(false);
+    setHasStoredToken(false);
+    await logout();
   };
 
+  const isHomeActive = pathname === '/';
+  const isShopActive = pathname === '/shop';
+  const isOrdersActive = pathname === '/profile';
+  const isCareActive = pathname === '/plant-care';
+
   return (
-    <>
-      <header
-        className={`fixed top-0 left-0 right-0 z-40 transition-all duration-300 px-4 sm:px-8 py-3 sm:py-4 ${
-          scrolled ? 'pt-3' : 'pt-5'
+    <header
+      className={`fixed top-0 left-0 right-0 z-[100] transition-all duration-300 px-4 sm:px-8 py-3 sm:py-4 ${
+        scrolled ? 'pt-3' : 'pt-5'
+      }`}
+    >
+      <div
+        className={`max-w-7xl mx-auto rounded-navbar transition-all duration-300 px-5 sm:px-8 py-3.5 flex items-center justify-between ${
+          scrolled
+            ? 'glass-panel shadow-glass border border-forest/10 bg-cream/90'
+            : 'bg-cream/60 backdrop-blur-md border border-forest/5 shadow-soft'
         }`}
       >
-        <div
-          className={`max-w-7xl mx-auto rounded-navbar transition-all duration-300 px-5 sm:px-8 py-3.5 flex items-center justify-between ${
-            scrolled
-              ? 'glass-panel shadow-glass border border-forest/10 bg-cream/90'
-              : 'bg-cream/60 backdrop-blur-md border border-forest/5 shadow-soft'
-          }`}
+        {/* Brand Logo -> Link to / */}
+        <Link
+          href="/"
+          className="flex items-center gap-2.5 text-forest group"
+          onClick={() => {
+            if (pathname === '/') {
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }
+          }}
         >
-          {/* Brand Logo */}
-          <a
-            href="#"
-            className="flex items-center gap-2.5 text-forest group"
-            onClick={(e) => {
-              if (window.location.hash) {
-                // Return to top cleanly
-                window.scrollTo({ top: 0, behavior: 'smooth' });
-              }
-            }}
-          >
-            <div className="w-9 h-9 rounded-full bg-forest text-cream flex items-center justify-center transition-transform duration-300 group-hover:scale-105 shadow-sm">
-              <Sprout className="w-5 h-5 text-sage-light" />
-            </div>
-            <div className="flex flex-col">
-              <span className="font-serif text-2xl font-bold tracking-widest text-forest leading-none">
-                VERDANT
-              </span>
-              <span className="text-[9px] uppercase tracking-[0.25em] text-moss font-semibold mt-0.5">
-                Botanical Sanctuary
-              </span>
-            </div>
-          </a>
+          <div className="w-9 h-9 rounded-full bg-forest text-cream flex items-center justify-center transition-transform duration-300 group-hover:scale-105 shadow-sm">
+            <Sprout className="w-5 h-5 text-sage-light" />
+          </div>
+          <div className="flex flex-col">
+            <span className="font-serif text-2xl font-bold tracking-widest text-forest leading-none">
+              StockSure
+            </span>
+            <span className="text-[9px] uppercase tracking-[0.25em] text-moss font-semibold mt-0.5">
+              Botanical Sanctuary
+            </span>
+          </div>
+        </Link>
 
-          {/* Desktop Navigation Links */}
-          <nav className="hidden lg:flex items-center gap-8 text-sm font-medium text-darktext/90">
-            <a
-              href="#"
-              className="hover:text-forest transition-colors relative py-1 after:content-[''] after:absolute after:bottom-0 after:left-0 after:w-0 after:h-[2px] after:bg-moss hover:after:w-full after:transition-all"
-            >
-              Home
-            </a>
-            <a
-              href="#shop"
-              className="hover:text-forest transition-colors relative py-1 after:content-[''] after:absolute after:bottom-0 after:left-0 after:w-0 after:h-[2px] after:bg-moss hover:after:w-full after:transition-all"
-            >
-              Shop
-            </a>
-
-            {/* Categories Dropdown */}
-            <div
-              className="relative"
-              onMouseEnter={() => setCategoriesDropdownOpen(true)}
-              onMouseLeave={() => setCategoriesDropdownOpen(false)}
-            >
-              <button
-                className="flex items-center gap-1.5 hover:text-forest transition-colors py-1"
-                onClick={() => setCategoriesDropdownOpen(!categoriesDropdownOpen)}
+        {/* Desktop Navigation Links */}
+        <nav className="hidden lg:flex items-center gap-8 text-sm font-medium text-darktext/90">
+          {isEffectivelySignedIn ? (
+            /* ================= SIGNED IN: EXACTLY Home, Shop, My Orders, Plant Care ================= */
+            <>
+              <Link
+                href="/"
+                className={`py-1 relative transition-colors ${
+                  isHomeActive
+                    ? 'text-forest font-bold after:content-[""] after:absolute after:bottom-0 after:left-0 after:w-full after:h-[2px] after:bg-moss'
+                    : 'hover:text-forest'
+                }`}
               >
-                <span>Categories</span>
-                <ChevronDown
-                  className={`w-4 h-4 transition-transform duration-200 ${
-                    categoriesDropdownOpen ? 'rotate-180 text-forest' : 'text-darktext/60'
-                  }`}
-                />
-              </button>
+                Home
+              </Link>
+              <Link
+                href="/shop"
+                className={`py-1 relative transition-colors ${
+                  isShopActive
+                    ? 'text-forest font-bold after:content-[""] after:absolute after:bottom-0 after:left-0 after:w-full after:h-[2px] after:bg-moss'
+                    : 'hover:text-forest'
+                }`}
+              >
+                Shop
+              </Link>
+              <Link
+                href="/profile?tab=orders"
+                className={`py-1 relative transition-colors ${
+                  isOrdersActive
+                    ? 'text-forest font-bold after:content-[""] after:absolute after:bottom-0 after:left-0 after:w-full after:h-[2px] after:bg-moss'
+                    : 'hover:text-forest'
+                }`}
+              >
+                My Orders
+              </Link>
+              <Link
+                href="/plant-care"
+                className={`py-1 relative transition-colors ${
+                  isCareActive
+                    ? 'text-forest font-bold after:content-[""] after:absolute after:bottom-0 after:left-0 after:w-full after:h-[2px] after:bg-moss'
+                    : 'hover:text-forest'
+                }`}
+              >
+                Plant Care
+              </Link>
+            </>
+          ) : (
+            /* ================= SIGNED OUT: About Us, Branches, Contact Us ================= */
+            <>
+              <a
+                href={pathname === '/' ? '#about' : '/#about'}
+                className="hover:text-forest transition-colors py-1"
+              >
+                About Us
+              </a>
+              <a
+                href={pathname === '/' ? '#branches' : '/#branches'}
+                className="hover:text-forest transition-colors py-1"
+              >
+                Branches
+              </a>
+              <a
+                href={pathname === '/' ? '#contact' : '/#contact'}
+                className="hover:text-forest transition-colors py-1"
+              >
+                Contact Us
+              </a>
+            </>
+          )}
+        </nav>
 
-              {categoriesDropdownOpen && (
-                <div className="absolute top-full left-0 mt-2 w-72 glass-panel rounded-panel shadow-elevated border border-forest/10 p-2 z-50 animate-fade-in bg-cream/95 backdrop-blur-xl">
-                  {CATEGORIES.map((cat) => (
-                    <button
-                      key={cat.id}
-                      onClick={() => handleCategoryClick(cat.id)}
-                      className="w-full text-left px-3.5 py-2.5 rounded-button hover:bg-forest/5 flex items-center justify-between text-xs text-darktext font-medium transition-colors group"
-                    >
-                      <span className="group-hover:text-forest group-hover:translate-x-1 transition-transform">
-                        {cat.name}
-                      </span>
-                      <span className="text-[10px] text-moss bg-moss/10 px-2 py-0.5 rounded-full font-semibold">
-                        {cat.count} plants
-                      </span>
-                    </button>
-                  ))}
-                  <div className="pt-2 mt-1 border-t border-forest/10">
-                    <button
-                      onClick={() => handleCategoryClick('all')}
-                      className="w-full text-center text-xs font-semibold text-forest hover:text-moss py-1"
-                    >
-                      View All Botanical Specimens →
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            <a
-              href="#about"
-              className="hover:text-forest transition-colors relative py-1 after:content-[''] after:absolute after:bottom-0 after:left-0 after:w-0 after:h-[2px] after:bg-moss hover:after:w-full after:transition-all"
+        {/* Right Section: Shop Now Button, Cart & Account */}
+        <div className="flex items-center gap-3 sm:gap-4">
+          {!isEffectivelySignedIn && pathname === '/' && (
+            <Link
+              href="/shop"
+              className="hidden sm:inline-flex items-center gap-1.5 py-1.5 px-4 rounded-full bg-forest text-cream font-bold text-xs uppercase tracking-wider hover:bg-forest-700 transition-colors shadow-soft"
             >
-              About
-            </a>
+              <span>Shop Now</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </Link>
+          )}
 
-            <a
-              href="#plant-care"
-              className="hover:text-forest transition-colors relative py-1 after:content-[''] after:absolute after:bottom-0 after:left-0 after:w-0 after:h-[2px] after:bg-moss hover:after:w-full after:transition-all"
-            >
-              Plant Care
-            </a>
-
-            <button
-              onClick={onOpenQuiz}
-              className="inline-flex items-center gap-1.5 text-xs font-semibold text-forest bg-forest/5 hover:bg-forest/10 px-3.5 py-1.5 rounded-full transition-colors border border-forest/10"
-            >
-              <Sparkles className="w-3.5 h-3.5 text-earth" />
-              <span>Plant Match Quiz</span>
-            </button>
-          </nav>
-
-          {/* Action Icons: Search, Account, Cart */}
-          <div className="flex items-center gap-3 sm:gap-4">
-            {/* Search Trigger */}
-            <button
-              onClick={onOpenSearch}
-              aria-label="Search collection"
-              className="p-2 sm:p-2.5 rounded-full hover:bg-forest/5 text-forest transition-colors relative"
-            >
-              <Search className="w-5 h-5" />
-            </button>
-
-            {/* Account / User Menu */}
-            <div className="relative">
-              {user ? (
-                <div
-                  className="relative"
-                  onMouseEnter={() => setUserDropdownOpen(true)}
-                  onMouseLeave={() => setUserDropdownOpen(false)}
-                >
-                  <button
-                    onClick={() => setUserDropdownOpen(!userDropdownOpen)}
-                    className="flex items-center gap-2 p-1.5 sm:px-3 sm:py-1.5 rounded-full bg-forest/5 hover:bg-forest/10 border border-forest/15 text-forest text-xs font-medium transition-colors"
-                  >
-                    <div className="w-6 h-6 rounded-full bg-forest text-cream text-[11px] font-bold flex items-center justify-center">
-                      {user.name.charAt(0).toUpperCase()}
-                    </div>
-                    <span className="hidden md:inline font-medium max-w-[100px] truncate">
-                      {user.name.split(' ')[0]}
-                    </span>
-                    <ChevronDown className="w-3.5 h-3.5 hidden md:inline text-forest/70" />
-                  </button>
-
-                  {userDropdownOpen && (
-                    <div className="absolute right-0 top-full mt-2 w-56 glass-panel rounded-panel shadow-elevated border border-forest/10 p-2 z-50 bg-cream/95 backdrop-blur-xl animate-fade-in">
-                      <div className="px-3 py-2 border-b border-forest/10">
-                        <p className="text-xs font-bold text-forest truncate">{user.name}</p>
-                        <p className="text-[11px] text-darktext/60 truncate">{user.email}</p>
-                        <span className="inline-block mt-1 text-[10px] bg-moss/10 text-moss px-2 py-0.5 rounded-full font-semibold">
-                          Botanical Club Member
-                        </span>
-                      </div>
-                      <button
-                        onClick={() => {
-                          logout();
-                          setUserDropdownOpen(false);
-                        }}
-                        className="w-full text-left px-3 py-2 mt-1 rounded-button hover:bg-red-50 text-xs text-red-700 font-medium flex items-center gap-2 transition-colors"
-                      >
-                        <LogOut className="w-3.5 h-3.5" />
-                        <span>Sign Out</span>
-                      </button>
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <button
-                  onClick={() => openAuthModal('login')}
-                  className="flex items-center gap-1.5 p-2 sm:px-3.5 sm:py-1.5 rounded-full hover:bg-forest/5 text-forest text-xs font-semibold transition-colors"
-                  aria-label="Account sign in"
-                >
-                  <UserIcon className="w-5 h-5 sm:w-4 sm:h-4" />
-                  <span className="hidden sm:inline">Sign In</span>
-                </button>
-              )}
-            </div>
-
-            {/* Shopping Cart Button with count badge */}
+          {/* Cart Icon (Only if signed in) */}
+          {isEffectivelySignedIn && (
             <button
               onClick={() => setIsCartOpen(true)}
               aria-label="Shopping Cart"
@@ -247,107 +209,181 @@ export default function Navbar({ onSelectCategory, onOpenSearch, onOpenQuiz }: N
                 </span>
               )}
             </button>
+          )}
 
-            {/* Mobile Hamburger Menu Toggle */}
-            <button
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              aria-label="Toggle mobile menu"
-              className="p-2 rounded-full hover:bg-forest/5 text-forest lg:hidden"
+          {/* Account / User Menu */}
+          {isEffectivelySignedIn ? (
+            <div className="relative" ref={dropdownRef}>
+              <button
+                onClick={() => setUserDropdownOpen(!userDropdownOpen)}
+                className="flex items-center gap-2 p-1.5 sm:px-3 sm:py-1.5 rounded-full bg-forest/5 hover:bg-forest/10 border border-forest/15 text-forest text-xs font-medium transition-colors"
+                aria-expanded={userDropdownOpen}
+              >
+                <div className="w-6 h-6 rounded-full bg-forest text-cream text-[11px] font-bold flex items-center justify-center">
+                  {user?.name ? user.name.charAt(0).toUpperCase() : 'U'}
+                </div>
+                <span className="hidden md:inline font-medium max-w-[100px] truncate">
+                  {user?.name ? user.name.split(' ')[0] : 'Profile'}
+                </span>
+                <ChevronDown className="w-3.5 h-3.5 hidden md:inline text-forest/70" />
+              </button>
+
+              {userDropdownOpen && (
+                <div className="absolute right-0 top-full mt-2 w-52 glass-panel rounded-panel shadow-elevated border border-forest/10 p-2 z-50 bg-cream/95 backdrop-blur-xl animate-fade-in text-xs">
+                  <div className="px-3 py-2 border-b border-forest/10 mb-1">
+                    <p className="font-bold text-forest truncate">{user?.name || 'StockSure Shopper'}</p>
+                    <p className="text-[10px] text-darktext/60 truncate">{user?.email || 'shopper@stocksure.in'}</p>
+                  </div>
+
+                  <Link
+                    href="/profile?tab=profile"
+                    onClick={() => setUserDropdownOpen(false)}
+                    className="flex items-center gap-2 w-full px-3 py-2 rounded-button hover:bg-forest/5 text-darktext hover:text-forest transition-colors"
+                  >
+                    <UserCheck className="w-3.5 h-3.5 text-moss" />
+                    <span>Profile</span>
+                  </Link>
+
+                  <Link
+                    href="/profile?tab=orders"
+                    onClick={() => setUserDropdownOpen(false)}
+                    className="flex items-center gap-2 w-full px-3 py-2 rounded-button hover:bg-forest/5 text-darktext hover:text-forest transition-colors"
+                  >
+                    <Package className="w-3.5 h-3.5 text-moss" />
+                    <span>My Orders</span>
+                  </Link>
+
+                  <div className="h-[1px] bg-forest/10 my-1" />
+
+                  <button
+                    onClick={handleLogout}
+                    className="flex items-center gap-2 w-full px-3 py-2 rounded-button hover:bg-red-50 text-red-700 transition-colors"
+                  >
+                    <LogOut className="w-3.5 h-3.5" />
+                    <span>Logout</span>
+                  </button>
+                </div>
+              )}
+            </div>
+          ) : (
+            <Link
+              href="/login"
+              className="flex items-center gap-1.5 p-2 sm:px-3.5 sm:py-1.5 rounded-full bg-forest text-cream hover:bg-forest-700 text-xs font-semibold transition-colors shadow-xs"
             >
-              {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
-            </button>
-          </div>
+              <UserIcon className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Sign In / Register</span>
+            </Link>
+          )}
+
+          {/* Mobile Hamburger Menu Toggle */}
+          <button
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            aria-label="Toggle mobile menu"
+            className="p-2 rounded-full hover:bg-forest/5 text-forest lg:hidden"
+          >
+            {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+          </button>
         </div>
-      </header>
+      </div>
 
       {/* Mobile Drawer Navigation */}
       {mobileMenuOpen && (
         <div className="fixed inset-0 z-30 lg:hidden bg-forest/40 backdrop-blur-sm animate-fade-in">
           <div className="fixed top-24 left-4 right-4 bg-cream rounded-panel border border-forest/15 shadow-elevated p-6 max-h-[85vh] overflow-y-auto">
-            <nav className="flex flex-col gap-4 text-darktext font-medium text-base">
-              <a
-                href="#"
-                onClick={() => setMobileMenuOpen(false)}
-                className="py-2 border-b border-forest/10 hover:text-forest"
-              >
-                Home
-              </a>
-              <a
-                href="#shop"
-                onClick={() => setMobileMenuOpen(false)}
-                className="py-2 border-b border-forest/10 hover:text-forest"
-              >
-                Shop All Plants
-              </a>
-
-              <div className="py-2 border-b border-forest/10">
-                <span className="text-xs uppercase tracking-wider text-moss font-bold block mb-2">
-                  Plant Categories
-                </span>
-                <div className="grid grid-cols-2 gap-2">
-                  {CATEGORIES.map((cat) => (
-                    <button
-                      key={cat.id}
-                      onClick={() => handleCategoryClick(cat.id)}
-                      className="text-left text-xs text-darktext/80 hover:text-forest p-2 rounded-button bg-cream-dark/40"
-                    >
-                      {cat.name}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <a
-                href="#about"
-                onClick={() => setMobileMenuOpen(false)}
-                className="py-2 border-b border-forest/10 hover:text-forest"
-              >
-                About Our Sanctuary
-              </a>
-              <a
-                href="#plant-care"
-                onClick={() => setMobileMenuOpen(false)}
-                className="py-2 border-b border-forest/10 hover:text-forest"
-              >
-                Plant Care & Wisdom
-              </a>
-
-              <button
-                onClick={() => {
-                  setMobileMenuOpen(false);
-                  onOpenQuiz();
-                }}
-                className="w-full text-center py-2.5 bg-forest/10 text-forest rounded-button font-semibold text-sm flex items-center justify-center gap-2"
-              >
-                <Sparkles className="w-4 h-4 text-earth" />
-                Find Your Perfect Plant (Quiz)
-              </button>
-
-              {!user ? (
-                <button
-                  onClick={() => {
-                    setMobileMenuOpen(false);
-                    openAuthModal('login');
-                  }}
-                  className="w-full py-3 bg-forest text-cream rounded-button font-semibold text-sm mt-2 shadow-sm"
-                >
-                  Sign In / Create Account
-                </button>
+            <nav className="flex flex-col gap-3 text-darktext font-medium text-sm">
+              {isEffectivelySignedIn ? (
+                <>
+                  <Link
+                    href="/"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="py-2 border-b border-forest/10 hover:text-forest"
+                  >
+                    Home
+                  </Link>
+                  <Link
+                    href="/shop"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="py-2 border-b border-forest/10 hover:text-forest"
+                  >
+                    Shop
+                  </Link>
+                  <Link
+                    href="/profile?tab=orders"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="py-2 border-b border-forest/10 hover:text-forest"
+                  >
+                    My Orders
+                  </Link>
+                  <Link
+                    href="/plant-care"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="py-2 border-b border-forest/10 hover:text-forest"
+                  >
+                    Plant Care
+                  </Link>
+                  <Link
+                    href="/profile?tab=profile"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="py-2 border-b border-forest/10 text-moss"
+                  >
+                    Profile ({user?.name})
+                  </Link>
+                  <button
+                    onClick={handleLogout}
+                    className="w-full text-left py-2 text-red-700 flex items-center gap-2"
+                  >
+                    <LogOut className="w-4 h-4" />
+                    <span>Logout</span>
+                  </button>
+                </>
               ) : (
-                <button
-                  onClick={() => {
-                    logout();
-                    setMobileMenuOpen(false);
-                  }}
-                  className="w-full py-2.5 border border-red-300 text-red-700 rounded-button font-medium text-sm mt-2"
-                >
-                  Sign Out ({user.name})
-                </button>
+                <>
+                  <a
+                    href={pathname === '/' ? '#about' : '/#about'}
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="py-2 border-b border-forest/10 hover:text-forest"
+                  >
+                    About Us
+                  </a>
+                  <a
+                    href={pathname === '/' ? '#branches' : '/#branches'}
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="py-2 border-b border-forest/10 hover:text-forest"
+                  >
+                    Branches
+                  </a>
+                  <a
+                    href={pathname === '/' ? '#contact' : '/#contact'}
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="py-2 border-b border-forest/10 hover:text-forest"
+                  >
+                    Contact Us
+                  </a>
+
+                  {pathname === '/' && (
+                    <Link
+                      href="/shop"
+                      onClick={() => setMobileMenuOpen(false)}
+                      className="py-2.5 px-4 bg-forest text-cream rounded-button font-semibold text-center flex items-center justify-center gap-2"
+                    >
+                      <span>Shop Now</span>
+                      <ArrowRight className="w-4 h-4" />
+                    </Link>
+                  )}
+
+                  <Link
+                    href="/login"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="w-full py-2.5 text-center border border-forest/20 text-forest rounded-button font-semibold text-xs mt-1"
+                  >
+                    Sign In / Register
+                  </Link>
+                </>
               )}
             </nav>
           </div>
         </div>
       )}
-    </>
+    </header>
   );
 }

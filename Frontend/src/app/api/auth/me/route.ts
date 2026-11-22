@@ -3,7 +3,7 @@ import { db } from '@/lib/db';
 
 export async function GET(req: NextRequest) {
   try {
-    const sessionCookie = req.cookies.get('verdant_session')?.value;
+    const sessionCookie = req.cookies.get('stocksure_session')?.value;
     if (!sessionCookie) {
       return NextResponse.json({ success: false, user: null }, { status: 200 });
     }
@@ -30,6 +30,6 @@ export async function GET(req: NextRequest) {
 
 export async function DELETE() {
   const response = NextResponse.json({ success: true, message: 'Signed out.' });
-  response.cookies.delete('verdant_session');
+  response.cookies.delete('stocksure_session');
   return response;
 }

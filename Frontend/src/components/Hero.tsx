@@ -71,7 +71,7 @@ export default function Hero({ onExplore, onFindPlant }: HeroProps) {
         {/* High-Resolution Fallback Poster to guarantee zero layout shift and immediate visual richness */}
         <Image
           src="/images/hero-poster.jpg"
-          alt="Verdant botanical nursery greenhouse sanctuary"
+          alt="StockSure botanical nursery greenhouse sanctuary"
           fill
           priority
           sizes="100vw"
